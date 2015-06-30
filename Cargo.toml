@@ -1,5 +1,5 @@
 [package]
-name = "gfapi"
+name = "gfapi-sys"
 description = "This crates provides FFI bindings for Gluster's API"
 version = "0.1.0"
 authors = ["Chris Holcombe <chris.holcombe@canonical.com>"]
