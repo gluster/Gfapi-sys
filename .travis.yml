@@ -1,1 +1,5 @@
+before_script:
+  - sudo add-apt-repository ppa:gluster/glusterfs-3.6 -y
+  - sudo apt-get update -q
+  - sudo apt-get install glusterfs-common -y
 language: rust
