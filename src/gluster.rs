@@ -3,7 +3,7 @@ use glfs::*;
 
 use std::error::Error as err;
 use std::mem::zeroed;
-use std::ffi::{CString, IntoStringError, NulError};
+use std::ffi::{CStr, CString, IntoStringError, NulError};
 use std::io::Error;
 use std::string::FromUtf8Error;
 
@@ -472,6 +472,280 @@ impl Gluster {
         let path = try!(CString::new(path));
         unsafe {
             let file_handle = glfs_opendir(self.cluster_handle, path.as_ptr());
+            Ok(file_handle)
+        }
+    }
+    pub fn getxattr(&self, path: &str, name: &str) -> Result<String, GlusterError> {
+        let path = try!(CString::new(path));
+        let name = try!(CString::new(name));
+        let mut xattr_val_buff: Vec<u8> = Vec::with_capacity(1024);
+        unsafe {
+            let ret_code = glfs_getxattr(self.cluster_handle,
+                                         path.as_ptr(),
+                                         name.as_ptr(),
+                                         xattr_val_buff.as_mut_ptr() as *mut c_void,
+                                         xattr_val_buff.len());
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+            }
+            // Set the buffer to the size of bytes read into it
+            xattr_val_buff.set_len(ret_code as usize);
+            Ok(String::from_utf8_lossy(&xattr_val_buff).into_owned())
+        }
+    }
+
+    pub fn lgetxattr(&self, path: &str, name: &str) -> Result<String, GlusterError> {
+        let path = try!(CString::new(path));
+        let name = try!(CString::new(name));
+        let mut xattr_val_buff: Vec<u8> = Vec::with_capacity(1024);
+        unsafe {
+            let ret_code = glfs_lgetxattr(self.cluster_handle,
+                                          path.as_ptr(),
+                                          name.as_ptr(),
+                                          xattr_val_buff.as_mut_ptr() as *mut c_void,
+                                          xattr_val_buff.len());
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+            }
+            // Set the buffer to the size of bytes read into it
+            xattr_val_buff.set_len(ret_code as usize);
+            Ok(String::from_utf8_lossy(&xattr_val_buff).into_owned())
+        }
+    }
+    pub fn fgetxattr(file_handle: &mut Struct_glfs_fd, name: &str) -> Result<String, GlusterError> {
+        let name = try!(CString::new(name));
+        let mut xattr_val_buff: Vec<u8> = Vec::with_capacity(1024);
+        unsafe {
+            let ret_code = glfs_fgetxattr(file_handle,
+                                          name.as_ptr(),
+                                          xattr_val_buff.as_mut_ptr() as *mut c_void,
+                                          xattr_val_buff.len());
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+            }
+            // Set the buffer to the size of bytes read into it
+            xattr_val_buff.set_len(ret_code as usize);
+            Ok(String::from_utf8_lossy(&xattr_val_buff).into_owned())
+        }
+    }
+    pub fn listxattr(&self, path: &str) -> Result<String, GlusterError> {
+        let path = try!(CString::new(path));
+        let mut xattr_val_buff: Vec<u8> = Vec::with_capacity(1024);
+        unsafe {
+            let ret_code = glfs_listxattr(self.cluster_handle,
+                                          path.as_ptr(),
+                                          xattr_val_buff.as_mut_ptr() as *mut c_void,
+                                          xattr_val_buff.len());
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+            }
+            // Set the buffer to the size of bytes read into it
+            xattr_val_buff.set_len(ret_code as usize);
+            Ok(String::from_utf8_lossy(&xattr_val_buff).into_owned())
+        }
+    }
+    pub fn llistxattr(&self, path: &str) -> Result<String, GlusterError> {
+        let path = try!(CString::new(path));
+        let mut xattr_val_buff: Vec<u8> = Vec::with_capacity(1024);
+        unsafe {
+            let ret_code = glfs_llistxattr(self.cluster_handle,
+                                           path.as_ptr(),
+                                           xattr_val_buff.as_mut_ptr() as *mut c_void,
+                                           xattr_val_buff.len());
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+            }
+            // Set the buffer to the size of bytes read into it
+            xattr_val_buff.set_len(ret_code as usize);
+            Ok(String::from_utf8_lossy(&xattr_val_buff).into_owned())
+        }
+    }
+    pub fn flistxattr(file_handle: &mut Struct_glfs_fd) -> Result<String, GlusterError> {
+        let mut xattr_val_buff: Vec<u8> = Vec::with_capacity(1024);
+        unsafe {
+            let ret_code = glfs_flistxattr(file_handle,
+                                           xattr_val_buff.as_mut_ptr() as *mut c_void,
+                                           xattr_val_buff.len());
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+            }
+            // Set the buffer to the size of bytes read into it
+            xattr_val_buff.set_len(ret_code as usize);
+            Ok(String::from_utf8_lossy(&xattr_val_buff).into_owned())
+        }
+    }
+    pub fn setxattr(&self,
+                    path: &str,
+                    name: &str,
+                    value: &[u8],
+                    flags: i32)
+                    -> Result<(), GlusterError> {
+        let path = try!(CString::new(path));
+        let name = try!(CString::new(name));
+        unsafe {
+            let ret_code = glfs_setxattr(self.cluster_handle,
+                                         path.as_ptr(),
+                                         name.as_ptr(),
+                                         value.as_ptr() as *const c_void,
+                                         value.len(),
+                                         flags);
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code))));
+            }
+        }
+        Ok(())
+    }
+    pub fn lsetxattr(&self,
+                     name: &str,
+                     value: &[u8],
+                     path: &str,
+                     flags: i32)
+                     -> Result<(), GlusterError> {
+        let name = try!(CString::new(name));
+        let path = try!(CString::new(path));
+        unsafe {
+            let ret_code = glfs_lsetxattr(self.cluster_handle,
+                                          path.as_ptr(),
+                                          name.as_ptr(),
+                                          value.as_ptr() as *const c_void,
+                                          value.len(),
+                                          flags);
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code))));
+            }
+        }
+        Ok(())
+    }
+    pub fn fsetxattr(file_handle: &mut Struct_glfs_fd,
+                     name: &str,
+                     value: &[u8],
+                     flags: i32)
+                     -> Result<(), GlusterError> {
+        let name = try!(CString::new(name));
+        unsafe {
+            let ret_code = glfs_fsetxattr(file_handle,
+                                          name.as_ptr(),
+                                          value.as_ptr() as *const c_void,
+                                          value.len(),
+                                          flags);
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code))));
+            }
+        }
+        Ok(())
+    }
+    pub fn removexattr(&self, path: &str, name: &str) -> Result<(), GlusterError> {
+        let path = try!(CString::new(path));
+        let name = try!(CString::new(name));
+        unsafe {
+            let ret_code = glfs_removexattr(self.cluster_handle, path.as_ptr(), name.as_ptr());
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code))));
+            }
+        }
+        Ok(())
+    }
+    pub fn lremovexattr(&self, path: &str, name: &str) -> Result<(), GlusterError> {
+        let path = try!(CString::new(path));
+        let name = try!(CString::new(name));
+        unsafe {
+            let ret_code = glfs_lremovexattr(self.cluster_handle, path.as_ptr(), name.as_ptr());
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code))));
+            }
+        }
+        Ok(())
+    }
+    pub fn fremovexattr(file_handle: &mut Struct_glfs_fd, name: &str) -> Result<(), GlusterError> {
+        let name = try!(CString::new(name));
+
+        unsafe {
+            let ret_code = glfs_fremovexattr(file_handle, name.as_ptr());
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code))));
+            }
+        }
+        Ok(())
+    }
+    pub fn fallocate(file_handle: &mut Struct_glfs_fd,
+                     offset: i64,
+                     keep_size: i32,
+                     len: usize)
+                     -> Result<(), GlusterError> {
+        unsafe {
+            let ret_code = glfs_fallocate(file_handle, keep_size, offset, len);
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code))));
+            }
+        }
+        Ok(())
+    }
+    pub fn discard(file_handle: &mut Struct_glfs_fd,
+                   offset: i64,
+                   len: usize)
+                   -> Result<(), GlusterError> {
+        unsafe {
+            let ret_code = glfs_discard(file_handle, offset, len);
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code))));
+            }
+        }
+        Ok(())
+    }
+    pub fn zerofill(file_handle: &mut Struct_glfs_fd,
+                    offset: i64,
+                    len: i64)
+                    -> Result<(), GlusterError> {
+        unsafe {
+            let ret_code = glfs_zerofill(file_handle, offset, len);
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code))));
+            }
+        }
+        Ok(())
+    }
+    pub fn getcwd(&self) -> Result<String, GlusterError> {
+        let mut cwd_val_buff: Vec<u8> = Vec::with_capacity(1024);
+        unsafe {
+            let cwd = glfs_getcwd(self.cluster_handle,
+                                  cwd_val_buff.as_mut_ptr() as *mut i8,
+                                  cwd_val_buff.len());
+            Ok(CStr::from_ptr(cwd).to_string_lossy().into_owned())
+        }
+    }
+    pub fn chdir(&self, path: &str) -> Result<(), GlusterError> {
+        let path = try!(CString::new(path));
+        unsafe {
+            let ret_code = glfs_chdir(self.cluster_handle, path.as_ptr());
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code))));
+            }
+        }
+        Ok(())
+    }
+    pub fn fchdir(file_handle: &mut Struct_glfs_fd) -> Result<(), GlusterError> {
+        unsafe {
+            let ret_code = glfs_fchdir(file_handle);
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code))));
+            }
+        }
+        Ok(())
+    }
+    // pub fn realpath(&self, path: &str) -> Result<String, GlusterError> {
+    // let path = try!(CString::new(path));
+    // let resolved_path_buf: Vec<u8> = Vec::with_capacity(512);
+    // unsafe {
+    // let real_path = glfs_realpath(self.cluster_handle,
+    // path.as_ptr(),
+    // resolved_path: *mut c_char);
+    // Ok(CStr::from_ptr(real_path).to_string_lossy().into_owned())
+    // }
+    // }
+    //
+    pub fn dup(file_handle: &mut Struct_glfs_fd) -> Result<*mut Struct_glfs_fd, GlusterError> {
+        unsafe {
+            let file_handle = glfs_dup(file_handle);
             Ok(file_handle)
         }
     }
