@@ -83,10 +83,23 @@ impl Drop for Gluster {
 
 impl Gluster {
     /// Connect to a Ceph cluster and return a connection handle glfs_t
-    pub fn connect(volume_name: &str) -> Result<Gluster, GlusterError> {
+    pub fn connect(volume_name: &str, server: &str) -> Result<Gluster, GlusterError> {
         let vol_name = try!(CString::new(volume_name));
+        let vol_transport = try!(CString::new("tcp"));
+        let vol_host = try!(CString::new(server));
         unsafe {
             let cluster_handle = glfs_new(vol_name.as_ptr());
+            if cluster_handle.is_null() {
+                return Err(GlusterError::new("glfs_new failed".to_string()));
+            }
+            let ret_code = glfs_set_volfile_server(cluster_handle,
+                                                   vol_transport.as_ptr(),
+                                                   vol_host.as_ptr(),
+                                                   24007);
+            if ret_code < 0 {
+                return Err(GlusterError::new(try!(get_error(ret_code))));
+            }
+
             let ret_code = glfs_init(cluster_handle);
             if ret_code < 0 {
                 return Err(GlusterError::new(try!(get_error(ret_code))));

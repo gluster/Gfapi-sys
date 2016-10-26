@@ -1,7 +1,7 @@
 [package]
 name = "gfapi-sys"
 description = "This crates provides FFI bindings for Gluster's API"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Chris Holcombe <chris.holcombe@canonical.com>"]
 repository = "https://github.com/cholcombe973/Gfapi-sys"
 license = "MIT"
