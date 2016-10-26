@@ -1,5 +1,6 @@
-use libc::{c_int, c_void, dev_t, mode_t, stat, strerror};
+use errno::errno;
 use glfs::*;
+use libc::{c_void, dev_t, mode_t, stat};
 
 use std::error::Error as err;
 use std::mem::zeroed;
@@ -57,12 +58,9 @@ impl From<Error> for GlusterError {
     }
 }
 
-fn get_error(n: c_int) -> Result<String, GlusterError> {
-    unsafe {
-        let error_cstring = CString::from_raw(strerror(n));
-        let message = try!(error_cstring.into_string());
-        Ok(message)
-    }
+fn get_error() -> String {
+    let error = errno();
+    format!("{}", error)
 }
 
 pub struct Gluster {
@@ -83,7 +81,7 @@ impl Drop for Gluster {
 
 impl Gluster {
     /// Connect to a Ceph cluster and return a connection handle glfs_t
-    pub fn connect(volume_name: &str, server: &str) -> Result<Gluster, GlusterError> {
+    pub fn connect(volume_name: &str, server: &str, port: i32) -> Result<Gluster, GlusterError> {
         let vol_name = try!(CString::new(volume_name));
         let vol_transport = try!(CString::new("tcp"));
         let vol_host = try!(CString::new(server));
@@ -95,14 +93,14 @@ impl Gluster {
             let ret_code = glfs_set_volfile_server(cluster_handle,
                                                    vol_transport.as_ptr(),
                                                    vol_host.as_ptr(),
-                                                   24007);
+                                                   port);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
 
             let ret_code = glfs_init(cluster_handle);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
             Ok(Gluster { cluster_handle: cluster_handle })
         }
@@ -143,7 +141,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_close(file_handle);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -158,7 +156,7 @@ impl Gluster {
                                       fill_buffer.len(),
                                       flags);
             if read_size < 0 {
-                return Err(GlusterError::new(try!(get_error(read_size as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             Ok(read_size)
 
@@ -175,7 +173,7 @@ impl Gluster {
                                         buffer.len(),
                                         flags);
             if write_size < 0 {
-                return Err(GlusterError::new(try!(get_error(write_size as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             Ok(write_size)
         }
@@ -190,7 +188,7 @@ impl Gluster {
                                        iov.len() as i32,
                                        flags);
             if read_size < 0 {
-                return Err(GlusterError::new(try!(get_error(read_size as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             Ok(read_size)
 
@@ -206,7 +204,7 @@ impl Gluster {
                                          iov.len() as i32,
                                          flags);
             if write_size < 0 {
-                return Err(GlusterError::new(try!(get_error(write_size as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             Ok(write_size)
 
@@ -226,7 +224,7 @@ impl Gluster {
                                        offset,
                                        flags);
             if read_size < 0 {
-                return Err(GlusterError::new(try!(get_error(read_size as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             Ok(read_size)
         }
@@ -244,7 +242,7 @@ impl Gluster {
                                          offset,
                                          flags);
             if write_size < 0 {
-                return Err(GlusterError::new(try!(get_error(write_size as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             Ok(write_size)
 
@@ -263,7 +261,7 @@ impl Gluster {
                                         offset,
                                         flags);
             if read_size < 0 {
-                return Err(GlusterError::new(try!(get_error(read_size as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             Ok(read_size)
         }
@@ -281,7 +279,7 @@ impl Gluster {
                                           offset,
                                           flags);
             if write_size < 0 {
-                return Err(GlusterError::new(try!(get_error(write_size as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             Ok(write_size)
         }
@@ -293,7 +291,7 @@ impl Gluster {
         unsafe {
             let file_offset = glfs_lseek(file_handle, offset, whence);
             if file_offset < 0 {
-                return Err(GlusterError::new(try!(get_error(file_offset as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             Ok(file_offset)
 
@@ -306,7 +304,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_truncate(self.cluster_handle, path.as_ptr(), length);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -315,7 +313,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_ftruncate(file_handle, length);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -326,7 +324,7 @@ impl Gluster {
             let mut stat_buf: stat = zeroed();
             let ret_code = glfs_lstat(self.cluster_handle, path.as_ptr(), &mut stat_buf);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             Ok(stat_buf)
         }
@@ -337,7 +335,7 @@ impl Gluster {
             let mut stat_buf: stat = zeroed();
             let ret_code = glfs_stat(self.cluster_handle, path.as_ptr(), &mut stat_buf);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             Ok(stat_buf)
         }
@@ -348,7 +346,7 @@ impl Gluster {
             let mut stat_buf: stat = zeroed();
             let ret_code = glfs_fstat(file_handle, &mut stat_buf);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             Ok(stat_buf)
         }
@@ -357,7 +355,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_fsync(file_handle);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -367,7 +365,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_fdatasync(file_handle);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+                return Err(GlusterError::new(get_error()));
             }
 
         }
@@ -378,7 +376,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_access(self.cluster_handle, path.as_ptr(), mode);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+                return Err(GlusterError::new(get_error()));
             }
 
         }
@@ -391,7 +389,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_symlink(self.cluster_handle, old_path.as_ptr(), new_path.as_ptr());
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+                return Err(GlusterError::new(get_error()));
             }
 
         }
@@ -406,7 +404,7 @@ impl Gluster {
                                          buf.as_mut_ptr() as *mut i8,
                                          buf.len());
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -417,7 +415,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_mknod(self.cluster_handle, path.as_ptr(), mode, dev);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
 
         }
@@ -429,7 +427,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_mkdir(self.cluster_handle, path.as_ptr(), mode);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
 
         }
@@ -441,7 +439,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_unlink(self.cluster_handle, path.as_ptr());
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
 
         }
@@ -452,7 +450,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_rmdir(self.cluster_handle, path.as_ptr());
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -463,7 +461,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_rename(self.cluster_handle, old_path.as_ptr(), new_path.as_ptr());
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -475,7 +473,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_link(self.cluster_handle, old_path.as_ptr(), new_path.as_ptr());
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -499,7 +497,7 @@ impl Gluster {
                                          xattr_val_buff.as_mut_ptr() as *mut c_void,
                                          xattr_val_buff.len());
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             // Set the buffer to the size of bytes read into it
             xattr_val_buff.set_len(ret_code as usize);
@@ -518,7 +516,7 @@ impl Gluster {
                                           xattr_val_buff.as_mut_ptr() as *mut c_void,
                                           xattr_val_buff.len());
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             // Set the buffer to the size of bytes read into it
             xattr_val_buff.set_len(ret_code as usize);
@@ -534,7 +532,7 @@ impl Gluster {
                                           xattr_val_buff.as_mut_ptr() as *mut c_void,
                                           xattr_val_buff.len());
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             // Set the buffer to the size of bytes read into it
             xattr_val_buff.set_len(ret_code as usize);
@@ -550,7 +548,7 @@ impl Gluster {
                                           xattr_val_buff.as_mut_ptr() as *mut c_void,
                                           xattr_val_buff.len());
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             // Set the buffer to the size of bytes read into it
             xattr_val_buff.set_len(ret_code as usize);
@@ -566,7 +564,7 @@ impl Gluster {
                                            xattr_val_buff.as_mut_ptr() as *mut c_void,
                                            xattr_val_buff.len());
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             // Set the buffer to the size of bytes read into it
             xattr_val_buff.set_len(ret_code as usize);
@@ -580,7 +578,7 @@ impl Gluster {
                                            xattr_val_buff.as_mut_ptr() as *mut c_void,
                                            xattr_val_buff.len());
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code as i32))));
+                return Err(GlusterError::new(get_error()));
             }
             // Set the buffer to the size of bytes read into it
             xattr_val_buff.set_len(ret_code as usize);
@@ -603,7 +601,7 @@ impl Gluster {
                                          value.len(),
                                          flags);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -624,7 +622,7 @@ impl Gluster {
                                           value.len(),
                                           flags);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -642,7 +640,7 @@ impl Gluster {
                                           value.len(),
                                           flags);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -653,7 +651,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_removexattr(self.cluster_handle, path.as_ptr(), name.as_ptr());
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -664,7 +662,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_lremovexattr(self.cluster_handle, path.as_ptr(), name.as_ptr());
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -675,7 +673,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_fremovexattr(file_handle, name.as_ptr());
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -688,7 +686,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_fallocate(file_handle, keep_size, offset, len);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -700,7 +698,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_discard(file_handle, offset, len);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -712,7 +710,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_zerofill(file_handle, offset, len);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -731,7 +729,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_chdir(self.cluster_handle, path.as_ptr());
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
@@ -740,7 +738,7 @@ impl Gluster {
         unsafe {
             let ret_code = glfs_fchdir(file_handle);
             if ret_code < 0 {
-                return Err(GlusterError::new(try!(get_error(ret_code))));
+                return Err(GlusterError::new(get_error()));
             }
         }
         Ok(())
