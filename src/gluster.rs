@@ -5,7 +5,9 @@ use libc::{c_void, dev_t, mode_t, stat};
 use std::error::Error as err;
 use std::mem::zeroed;
 use std::ffi::{CStr, CString, IntoStringError, NulError};
+use std::fmt;
 use std::io::Error;
+use std::path::Path;
 use std::string::FromUtf8Error;
 
 /// Custom error handling for the library
@@ -18,6 +20,32 @@ pub enum GlusterError {
     IntoStringError(IntoStringError),
 }
 
+impl fmt::Display for GlusterError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(self.description())
+    }
+}
+
+impl err for GlusterError {
+    fn description(&self) -> &str {
+        match *self {
+            GlusterError::FromUtf8Error(ref e) => e.description(),
+            GlusterError::NulError(ref e) => e.description(),
+            GlusterError::Error(ref e) => &e,
+            GlusterError::IoError(ref e) => e.description(),
+            GlusterError::IntoStringError(ref e) => e.description(),
+        }
+    }
+    fn cause(&self) -> Option<&err> {
+        match *self {
+            GlusterError::FromUtf8Error(ref e) => e.cause(),
+            GlusterError::NulError(ref e) => e.cause(),
+            GlusterError::Error(_) => None,
+            GlusterError::IoError(ref e) => e.cause(),
+            GlusterError::IntoStringError(ref e) => e.cause(),
+        }
+    }
+}
 impl GlusterError {
     /// Create a new GlusterError with a String message
     fn new(err: String) -> GlusterError {
@@ -81,7 +109,8 @@ impl Drop for Gluster {
 
 impl Gluster {
     /// Connect to a Ceph cluster and return a connection handle glfs_t
-    pub fn connect(volume_name: &str, server: &str, port: i32) -> Result<Gluster, GlusterError> {
+    /// port is usually 24007 but may differ depending on how the service was configured
+    pub fn connect(volume_name: &str, server: &str, port: u16) -> Result<Gluster, GlusterError> {
         let vol_name = try!(CString::new(volume_name));
         let vol_transport = try!(CString::new("tcp"));
         let vol_host = try!(CString::new(server));
@@ -93,7 +122,7 @@ impl Gluster {
             let ret_code = glfs_set_volfile_server(cluster_handle,
                                                    vol_transport.as_ptr(),
                                                    vol_host.as_ptr(),
-                                                   port);
+                                                   port as ::libc::c_int);
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
@@ -119,8 +148,9 @@ impl Gluster {
             glfs_fini(self.cluster_handle);
         }
     }
-    pub fn open(&self, path: &str, flags: i32) -> Result<*mut Struct_glfs_fd, GlusterError> {
-        let path = try!(CString::new(path));
+    pub fn open(&self, path: &Path, flags: i32) -> Result<*mut Struct_glfs_fd, GlusterError> {
+        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        // let path = try!(CString::new(path));
         unsafe {
             let file_handle = glfs_open(self.cluster_handle, path.as_ptr(), flags);
             Ok(file_handle)
@@ -148,7 +178,7 @@ impl Gluster {
     }
     pub fn read(&self,
                 file_handle: *mut Struct_glfs_fd,
-                fill_buffer: &mut [u8],
+                fill_buffer: &mut Vec<u8>,
                 count: usize,
                 flags: i32)
                 -> Result<isize, GlusterError> {
@@ -160,6 +190,8 @@ impl Gluster {
             if read_size < 0 {
                 return Err(GlusterError::new(get_error()));
             }
+            println!("Read_size: {}", read_size);
+            fill_buffer.set_len(read_size as usize);
             Ok(read_size)
 
         }
@@ -342,8 +374,8 @@ impl Gluster {
             Ok(stat_buf)
         }
     }
-    pub fn stat(&self, path: &str) -> Result<stat, GlusterError> {
-        let path = try!(CString::new(path));
+    pub fn stat(&self, path: &Path) -> Result<stat, GlusterError> {
+        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
         unsafe {
             let mut stat_buf: stat = zeroed();
             let ret_code = glfs_stat(self.cluster_handle, path.as_ptr(), &mut stat_buf);
@@ -492,8 +524,8 @@ impl Gluster {
         Ok(())
     }
 
-    pub fn opendir(&self, path: &str) -> Result<*mut Struct_glfs_fd, GlusterError> {
-        let path = try!(CString::new(path));
+    pub fn opendir(&self, path: &Path) -> Result<*mut Struct_glfs_fd, GlusterError> {
+        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
         unsafe {
             let file_handle = glfs_opendir(self.cluster_handle, path.as_ptr());
             Ok(file_handle)
