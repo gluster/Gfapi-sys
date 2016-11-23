@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types)]
-use libc::{c_char, c_int, c_long, c_ushort, c_uchar, c_void, dev_t, gid_t, ino_t, mode_t, off_t,
-           size_t, stat, ssize_t, timespec, uid_t};
+use libc::{c_char, c_int, c_long, c_void, dev_t, dirent, gid_t, mode_t, off_t, size_t, stat,
+           ssize_t, timespec, uid_t};
 
 pub enum Struct_glfs { }
 pub type glfs_t = Struct_glfs;
@@ -15,21 +15,6 @@ pub type glfs_io_cbk = ::std::option::Option<extern "C" fn(fd: *mut glfs_fd_t,
 pub struct iovec {
     pub iov_base: *const c_void,
     pub iov_len: size_t,
-}
-
-#[repr(C)]
-pub struct dirent {
-    /// inode number
-    pub d_ino: ino_t,
-    /// not an offset;
-    pub d_off: off_t,
-    /// length of this record
-    pub d_reclen: c_ushort,
-    /// type of file; not supported
-    /// by all filesystem types
-    pub d_type: c_uchar,
-    /// filename
-    pub d_name: [c_char; 256],
 }
 
 #[link(name = "gfapi")]
