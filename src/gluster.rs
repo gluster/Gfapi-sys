@@ -132,7 +132,14 @@ impl Iterator for GlusterDirectory {
                 glfs_closedir(self.dir_handle);
                 return None;
             }
-            glfs_telldir(self.dir_handle);
+            if dirent.d_ino == 0 {
+                // End of stream reached
+                return None;
+            }
+            let telldir_retcode = glfs_telldir(self.dir_handle);
+            if telldir_retcode < 0 {
+                return None;
+            }
             let file_name = CStr::from_ptr(dirent.d_name.as_ptr());
             return Some(DirEntry {
                 path: PathBuf::from(file_name.to_string_lossy().into_owned()),
