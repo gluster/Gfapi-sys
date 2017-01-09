@@ -9,3 +9,4 @@ license = "MIT"
 [dependencies]
 errno = "^0.2"
 libc = "^0.2"
+libffi = "^0.4"
