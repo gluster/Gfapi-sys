@@ -8,6 +8,7 @@ setup_gluster() {
   gluster vol create test $HOSTNAME:/mnt/gluster-brick force
   echo -e "\tstart vol"
   gluster vol start test
+  gluster vol set test server.allow-insecure on
 }
 
 _gluster() {
