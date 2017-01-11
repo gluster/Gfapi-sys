@@ -8,6 +8,11 @@ setup_gluster() {
   gluster vol create test $HOSTNAME:/mnt/gluster-brick force
   echo -e "\tstart vol"
   gluster vol start test
+  gluster vol set test server.allow-insecure on
+  mkdir /mnt/glusterfs
+  mount -t glusterfs localhost:test /mnt/glusterfs
+  mkdir /mnt/glusterfs/gfapi
+  chmod 777 /mnt/glusterfs/gfapi
 }
 
 _gluster() {

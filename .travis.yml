@@ -1,11 +1,12 @@
 sudo: required
+dist: trusty
 language: rust
 addons:
   apt:
     packages:
       - libffi-dev libffi6 texinfo
 before_install:
-  - sudo add-apt-repository ppa:gluster/glusterfs-3.6 -y
+  - sudo add-apt-repository ppa:gluster/glusterfs-3.8 -y
   - sudo apt-get update -q
   - sudo apt-get install glusterfs-common glusterfs-server -y
 install:
