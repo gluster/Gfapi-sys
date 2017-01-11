@@ -460,9 +460,7 @@ impl Gluster {
             let ret_code = glfs_stat(self.cluster_handle, path.as_ptr(), &mut stat_buf);
             if ret_code < 0 {
                 let error = errno();
-                println!("Error code: {:?}", error);
                 if error == Errno(ENOENT) {
-                    println!("No entry");
                     return Ok(false);
                 }
                 return Err(GlusterError::new(get_error()));
