@@ -1,6 +1,7 @@
-use errno::errno;
+use errno::{errno, Errno};
 use glfs::*;
-use libc::{c_uchar, c_void, dev_t, dirent, ino_t, mode_t, stat};
+use libc::{c_uchar, c_void, dev_t, dirent, ENOENT, ino_t, mode_t, stat};
+use libffi::high::Closure3;
 
 use std::error::Error as err;
 use std::mem::zeroed;
@@ -91,7 +92,14 @@ fn get_error() -> String {
     let error = errno();
     format!("{}", error)
 }
-
+// pub type glfs_io_cbk = ::std::option::Option<extern "C" fn(fd: *mut glfs_fd_t,
+// ret: ssize_t,
+// data: *mut c_void)
+// -> ()>;pub type glfs_io_cbk = ::std::option::Option<extern "C" fn(fd: *mut glfs_fd_t,
+// ret: ssize_t,
+// data: *mut c_void)
+// -> ()>;
+//
 #[derive(Debug)]
 pub struct Gluster {
     cluster_handle: *mut Struct_glfs,
@@ -258,6 +266,31 @@ impl Gluster {
             Ok(write_size)
         }
     }
+
+    pub fn write_async<F>(&self,
+                          file_handle: *mut Struct_glfs_fd,
+                          buffer: &[u8],
+                          flags: i32,
+                          callback: F,
+                          data: &mut ::libc::c_void)
+                          -> Result<(), GlusterError>
+        where F: Fn(*mut Struct_glfs_fd, isize, *mut ::libc::c_void)
+    {
+        let closure = Closure3::new(&callback);
+        let callback_ptr = closure.code_ptr();
+        unsafe {
+            let ret_code = glfs_write_async(file_handle,
+                                            buffer.as_ptr() as *const c_void,
+                                            buffer.len(),
+                                            flags,
+                                            Some(*callback_ptr),
+                                            data);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
     pub fn readv(&self,
                  file_handle: *mut Struct_glfs_fd,
                  iov: &mut [&mut [u8]],
@@ -419,6 +452,23 @@ impl Gluster {
             Ok(stat_buf)
         }
     }
+    /// Tests for the existance of a file.  Returns true/false respectively.
+    pub fn exists(&self, path: &Path) -> Result<bool, GlusterError> {
+        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        unsafe {
+            let mut stat_buf: stat = zeroed();
+            let ret_code = glfs_stat(self.cluster_handle, path.as_ptr(), &mut stat_buf);
+            if ret_code < 0 {
+                let error = errno();
+                if error == Errno(ENOENT) {
+                    return Ok(false);
+                }
+                return Err(GlusterError::new(get_error()));
+            }
+            Ok(false)
+        }
+    }
+
     pub fn stat(&self, path: &Path) -> Result<stat, GlusterError> {
         let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
         unsafe {
