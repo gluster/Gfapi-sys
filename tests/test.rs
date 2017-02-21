@@ -14,7 +14,7 @@ fn integration_test1() {
     println!("Connecting to localhost gluster");
     let cluster = Gluster::connect("test", "localhost", 24007).unwrap();
     println!("Creating a directory");
-    cluster.mkdir(&Path::new("gfapi"), S_IRWXU).unwrap();
+    cluster.mkdir(&Path::new("gfapi/new_dir"), S_IRWXU).unwrap();
     println!("Creating a test file");
     let file_handle = cluster.create(&Path::new("gfapi/test"),
                 O_CREAT | O_RDWR | O_TRUNC,
