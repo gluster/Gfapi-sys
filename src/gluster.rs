@@ -1,6 +1,6 @@
 use errno::{errno, Errno};
 use glfs::*;
-use libc::{c_uchar, c_void, dev_t, dirent, ENOENT, ino_t, mode_t, stat};
+use libc::{c_uchar, c_void, dev_t, dirent, ENOENT, ino_t, mode_t, stat, timespec};
 use libffi::high::Closure3;
 
 use std::error::Error as err;
@@ -893,6 +893,42 @@ impl Gluster {
         }
         Ok(())
     }
+
+    pub fn utimens(&self, path: &Path, times: &mut timespec) -> Result<(), GlusterError> {
+        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        unsafe {
+            let ret_code = glfs_utimens(self.cluster_handle, path.as_ptr(), times);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn lutimens(&self, path: &Path, times: &mut timespec) -> Result<(), GlusterError> {
+        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        unsafe {
+            let ret_code = glfs_lutimens(self.cluster_handle, path.as_ptr(), times);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn futimens(&self,
+                    file_handle: *mut Struct_glfs_fd,
+                    times: &mut timespec)
+                    -> Result<(), GlusterError> {
+        unsafe {
+            let ret_code = glfs_futimens(file_handle, times);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
     // pub fn realpath(&self, path: &str) -> Result<String, GlusterError> {
     // let path = try!(CString::new(path));
     // let resolved_path_buf: Vec<u8> = Vec::with_capacity(512);
