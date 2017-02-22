@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types)]
-use libc::{c_char, c_int, c_long, c_void, dev_t, dirent, gid_t, mode_t, off_t, size_t, stat,
-           ssize_t, timespec, uid_t};
+use libc::{c_char, c_int, c_long, c_void, dev_t, dirent, gid_t, flock, mode_t, off_t, size_t,
+           stat, ssize_t, timespec, uid_t};
 
 pub enum Struct_glfs { }
 pub type glfs_t = Struct_glfs;
@@ -350,7 +350,6 @@ extern "C" {
                          path: *const c_char,
                          resolved_path: *mut c_char)
                          -> *mut c_char;
-    // pub fn glfs_posix_lock(fd: *mut glfs_fd_t, cmd: c_int,
-    //                       flock: *mut Struct_flock) -> c_int;
+    pub fn glfs_posix_lock(fd: *mut glfs_fd_t, cmd: c_int, flock: *mut flock) -> c_int;
     pub fn glfs_dup(fd: *mut glfs_fd_t) -> *mut glfs_fd_t;
 }

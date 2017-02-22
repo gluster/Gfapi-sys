@@ -1,6 +1,7 @@
 use errno::{errno, Errno};
 use glfs::*;
-use libc::{c_uchar, c_void, dev_t, dirent, ENOENT, ino_t, mode_t, stat};
+use libc::{c_uchar, c_void, dev_t, dirent, ENOENT, flock, LOCK_SH, LOCK_EX, LOCK_UN, ino_t,
+           mode_t, stat, timespec};
 use libffi::high::Closure3;
 
 use std::error::Error as err;
@@ -8,6 +9,7 @@ use std::mem::zeroed;
 use std::ffi::{CStr, CString, IntoStringError, NulError};
 use std::fmt;
 use std::io::Error;
+use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::ptr;
 use std::string::FromUtf8Error;
@@ -92,6 +94,29 @@ fn get_error() -> String {
     let error = errno();
     format!("{}", error)
 }
+
+/// Apply or remove an advisory lock on the open file.
+pub enum PosixLockCmd {
+    /// Place  an  exclusive  lock.  Only one process may hold an
+    /// exclusive lock for a given file at a given time.
+    Exclusive,
+    /// Place a shared lock. More than one  process may  hold  a shared
+    /// lock for a given file at a given time.
+    Shared,
+    /// Remove an existing lock held by this process.
+    Unlock,
+}
+
+impl Into<i32> for PosixLockCmd {
+    fn into(self) -> i32 {
+        match self {
+            PosixLockCmd::Shared => LOCK_SH,
+            PosixLockCmd::Exclusive => LOCK_EX,
+            PosixLockCmd::Unlock => LOCK_UN,
+        }
+    }
+}
+
 // pub type glfs_io_cbk = ::std::option::Option<extern "C" fn(fd: *mut glfs_fd_t,
 // ret: ssize_t,
 // data: *mut c_void)
@@ -201,7 +226,7 @@ impl Gluster {
         }
     }
     pub fn open(&self, path: &Path, flags: i32) -> Result<*mut Struct_glfs_fd, GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
             let file_handle = glfs_open(self.cluster_handle, path.as_ptr(), flags);
             Ok(file_handle)
@@ -212,7 +237,7 @@ impl Gluster {
                   flags: i32,
                   mode: mode_t)
                   -> Result<*mut Struct_glfs_fd, GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
             let file_handle = glfs_creat(self.cluster_handle, path.as_ptr(), flags, mode);
             if file_handle.is_null() {
@@ -419,7 +444,7 @@ impl Gluster {
 
     }
     pub fn truncate(&self, path: &Path, length: i64) -> Result<(), GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
 
         unsafe {
             let ret_code = glfs_truncate(self.cluster_handle, path.as_ptr(), length);
@@ -442,7 +467,7 @@ impl Gluster {
         Ok(())
     }
     pub fn lsstat(&self, path: &Path) -> Result<stat, GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
             let mut stat_buf: stat = zeroed();
             let ret_code = glfs_lstat(self.cluster_handle, path.as_ptr(), &mut stat_buf);
@@ -454,7 +479,7 @@ impl Gluster {
     }
     /// Tests for the existance of a file.  Returns true/false respectively.
     pub fn exists(&self, path: &Path) -> Result<bool, GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
             let mut stat_buf: stat = zeroed();
             let ret_code = glfs_stat(self.cluster_handle, path.as_ptr(), &mut stat_buf);
@@ -470,7 +495,7 @@ impl Gluster {
     }
 
     pub fn stat(&self, path: &Path) -> Result<stat, GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
             let mut stat_buf: stat = zeroed();
             let ret_code = glfs_stat(self.cluster_handle, path.as_ptr(), &mut stat_buf);
@@ -512,7 +537,7 @@ impl Gluster {
         Ok(())
     }
     pub fn access(&self, path: &Path, mode: i32) -> Result<(), GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
             let ret_code = glfs_access(self.cluster_handle, path.as_ptr(), mode);
             if ret_code < 0 {
@@ -524,8 +549,8 @@ impl Gluster {
     }
 
     pub fn symlink(&self, oldpath: &Path, newpath: &Path) -> Result<(), GlusterError> {
-        let old_path = try!(CString::new(oldpath.as_os_str().to_string_lossy().as_ref()));
-        let new_path = try!(CString::new(newpath.as_os_str().to_string_lossy().as_ref()));
+        let old_path = try!(CString::new(oldpath.as_os_str().as_bytes()));
+        let new_path = try!(CString::new(newpath.as_os_str().as_bytes()));
         unsafe {
             let ret_code = glfs_symlink(self.cluster_handle, old_path.as_ptr(), new_path.as_ptr());
             if ret_code < 0 {
@@ -537,7 +562,7 @@ impl Gluster {
     }
 
     pub fn readlink(&self, path: &Path, buf: &mut [u8]) -> Result<(), GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
             let ret_code = glfs_readlink(self.cluster_handle,
                                          path.as_ptr(),
@@ -551,7 +576,7 @@ impl Gluster {
     }
 
     pub fn mknod(&self, path: &Path, mode: mode_t, dev: dev_t) -> Result<(), GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
             let ret_code = glfs_mknod(self.cluster_handle, path.as_ptr(), mode, dev);
             if ret_code < 0 {
@@ -563,7 +588,7 @@ impl Gluster {
     }
 
     pub fn mkdir(&self, path: &Path, mode: mode_t) -> Result<(), GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
             let ret_code = glfs_mkdir(self.cluster_handle, path.as_ptr(), mode);
             if ret_code < 0 {
@@ -575,7 +600,7 @@ impl Gluster {
     }
 
     pub fn unlink(&self, path: &Path) -> Result<(), GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
             let ret_code = glfs_unlink(self.cluster_handle, path.as_ptr());
             if ret_code < 0 {
@@ -586,7 +611,7 @@ impl Gluster {
         Ok(())
     }
     pub fn rmdir(&self, path: &Path) -> Result<(), GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
             let ret_code = glfs_rmdir(self.cluster_handle, path.as_ptr());
             if ret_code < 0 {
@@ -596,8 +621,8 @@ impl Gluster {
         Ok(())
     }
     pub fn rename(&self, oldpath: &Path, newpath: &Path) -> Result<(), GlusterError> {
-        let old_path = try!(CString::new(oldpath.as_os_str().to_string_lossy().as_ref()));
-        let new_path = try!(CString::new(newpath.as_os_str().to_string_lossy().as_ref()));
+        let old_path = try!(CString::new(oldpath.as_os_str().as_bytes()));
+        let new_path = try!(CString::new(newpath.as_os_str().as_bytes()));
         unsafe {
             let ret_code = glfs_rename(self.cluster_handle, old_path.as_ptr(), new_path.as_ptr());
             if ret_code < 0 {
@@ -608,8 +633,8 @@ impl Gluster {
     }
 
     pub fn link(&self, oldpath: &Path, newpath: &Path) -> Result<(), GlusterError> {
-        let old_path = try!(CString::new(oldpath.as_os_str().to_string_lossy().as_ref()));
-        let new_path = try!(CString::new(newpath.as_os_str().to_string_lossy().as_ref()));
+        let old_path = try!(CString::new(oldpath.as_os_str().as_bytes()));
+        let new_path = try!(CString::new(newpath.as_os_str().as_bytes()));
         unsafe {
             let ret_code = glfs_link(self.cluster_handle, old_path.as_ptr(), new_path.as_ptr());
             if ret_code < 0 {
@@ -620,14 +645,14 @@ impl Gluster {
     }
 
     pub fn opendir(&self, path: &Path) -> Result<*mut Struct_glfs_fd, GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
             let file_handle = glfs_opendir(self.cluster_handle, path.as_ptr());
             Ok(file_handle)
         }
     }
     pub fn getxattr(&self, path: &Path, name: &str) -> Result<String, GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         let name = try!(CString::new(name));
         let mut xattr_val_buff: Vec<u8> = Vec::with_capacity(1024);
         unsafe {
@@ -646,7 +671,7 @@ impl Gluster {
     }
 
     pub fn lgetxattr(&self, path: &Path, name: &str) -> Result<String, GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         let name = try!(CString::new(name));
         let mut xattr_val_buff: Vec<u8> = Vec::with_capacity(1024);
         unsafe {
@@ -683,7 +708,7 @@ impl Gluster {
         }
     }
     pub fn listxattr(&self, path: &Path) -> Result<String, GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         let mut xattr_val_buff: Vec<u8> = Vec::with_capacity(1024);
         unsafe {
             let ret_code = glfs_listxattr(self.cluster_handle,
@@ -699,7 +724,7 @@ impl Gluster {
         }
     }
     pub fn llistxattr(&self, path: &Path) -> Result<String, GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         let mut xattr_val_buff: Vec<u8> = Vec::with_capacity(1024);
         unsafe {
             let ret_code = glfs_llistxattr(self.cluster_handle,
@@ -734,7 +759,7 @@ impl Gluster {
                     value: &[u8],
                     flags: i32)
                     -> Result<(), GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         let name = try!(CString::new(name));
         unsafe {
             let ret_code = glfs_setxattr(self.cluster_handle,
@@ -756,7 +781,7 @@ impl Gluster {
                      flags: i32)
                      -> Result<(), GlusterError> {
         let name = try!(CString::new(name));
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
             let ret_code = glfs_lsetxattr(self.cluster_handle,
                                           path.as_ptr(),
@@ -790,7 +815,7 @@ impl Gluster {
         Ok(())
     }
     pub fn removexattr(&self, path: &Path, name: &str) -> Result<(), GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         let name = try!(CString::new(name));
         unsafe {
             let ret_code = glfs_removexattr(self.cluster_handle, path.as_ptr(), name.as_ptr());
@@ -801,7 +826,7 @@ impl Gluster {
         Ok(())
     }
     pub fn lremovexattr(&self, path: &Path, name: &str) -> Result<(), GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         let name = try!(CString::new(name));
         unsafe {
             let ret_code = glfs_lremovexattr(self.cluster_handle, path.as_ptr(), name.as_ptr());
@@ -875,7 +900,7 @@ impl Gluster {
         }
     }
     pub fn chdir(&self, path: &Path) -> Result<(), GlusterError> {
-        let path = try!(CString::new(path.as_os_str().to_string_lossy().as_ref()));
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
             let ret_code = glfs_chdir(self.cluster_handle, path.as_ptr());
             if ret_code < 0 {
@@ -893,6 +918,56 @@ impl Gluster {
         }
         Ok(())
     }
+
+    pub fn utimens(&self, path: &Path, times: &mut timespec) -> Result<(), GlusterError> {
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
+        unsafe {
+            let ret_code = glfs_utimens(self.cluster_handle, path.as_ptr(), times);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn lutimens(&self, path: &Path, times: &mut timespec) -> Result<(), GlusterError> {
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
+        unsafe {
+            let ret_code = glfs_lutimens(self.cluster_handle, path.as_ptr(), times);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn futimens(&self,
+                    file_handle: *mut Struct_glfs_fd,
+                    times: &mut timespec)
+                    -> Result<(), GlusterError> {
+        unsafe {
+            let ret_code = glfs_futimens(file_handle, times);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn posixlock(&self,
+                     file_handle: *mut Struct_glfs_fd,
+                     command: PosixLockCmd,
+                     flock: &mut flock)
+                     -> Result<(), GlusterError> {
+        unsafe {
+            let ret_code = glfs_posix_lock(file_handle, command.into(), flock);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
     // pub fn realpath(&self, path: &str) -> Result<String, GlusterError> {
     // let path = try!(CString::new(path));
     // let resolved_path_buf: Vec<u8> = Vec::with_capacity(512);
