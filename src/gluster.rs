@@ -919,10 +919,12 @@ impl Gluster {
         Ok(())
     }
 
-    pub fn utimens(&self, path: &Path, times: &mut timespec) -> Result<(), GlusterError> {
+    /// times[0] specifies the new "last access time" (atime);
+    /// times[1] specifies the new "last modification time" (mtime).
+    pub fn utimens(&self, path: &Path, times: &[timespec; 2]) -> Result<(), GlusterError> {
         let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
-            let ret_code = glfs_utimens(self.cluster_handle, path.as_ptr(), times);
+            let ret_code = glfs_utimens(self.cluster_handle, path.as_ptr(), times.as_ptr());
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
@@ -930,10 +932,12 @@ impl Gluster {
         Ok(())
     }
 
-    pub fn lutimens(&self, path: &Path, times: &mut timespec) -> Result<(), GlusterError> {
+    /// times[0] specifies the new "last access time" (atime);
+    /// times[1] specifies the new "last modification time" (mtime).
+    pub fn lutimens(&self, path: &Path, times: &[timespec; 2]) -> Result<(), GlusterError> {
         let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
-            let ret_code = glfs_lutimens(self.cluster_handle, path.as_ptr(), times);
+            let ret_code = glfs_lutimens(self.cluster_handle, path.as_ptr(), times.as_ptr());
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
@@ -941,12 +945,14 @@ impl Gluster {
         Ok(())
     }
 
+    /// times[0] specifies the new "last access time" (atime);
+    /// times[1] specifies the new "last modification time" (mtime).
     pub fn futimens(&self,
                     file_handle: *mut Struct_glfs_fd,
-                    times: &mut timespec)
+                    times: &[timespec; 2])
                     -> Result<(), GlusterError> {
         unsafe {
-            let ret_code = glfs_futimens(file_handle, times);
+            let ret_code = glfs_futimens(file_handle, times.as_ptr());
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
@@ -961,6 +967,66 @@ impl Gluster {
                      -> Result<(), GlusterError> {
         unsafe {
             let ret_code = glfs_posix_lock(file_handle, command.into(), flock);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn chmod(&self, path: &Path, mode: mode_t) -> Result<(), GlusterError> {
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
+        unsafe {
+            let ret_code = glfs_chmod(self.cluster_handle, path.as_ptr(), mode);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn fchmod(&self,
+                  file_handle: *mut Struct_glfs_fd,
+                  mode: mode_t)
+                  -> Result<(), GlusterError> {
+        unsafe {
+            let ret_code = glfs_fchmod(file_handle, mode);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn chown(&self, path: &Path, uid: u32, gid: u32) -> Result<(), GlusterError> {
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
+        unsafe {
+            let ret_code = glfs_chown(self.cluster_handle, path.as_ptr(), uid, gid);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn lchown(&self, path: &Path, uid: u32, gid: u32) -> Result<(), GlusterError> {
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
+        unsafe {
+            let ret_code = glfs_lchown(self.cluster_handle, path.as_ptr(), uid, gid);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn fchown(&self,
+                  file_handle: *mut Struct_glfs_fd,
+                  uid: u32,
+                  gid: u32)
+                  -> Result<(), GlusterError> {
+        unsafe {
+            let ret_code = glfs_fchown(file_handle, uid, gid);
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }

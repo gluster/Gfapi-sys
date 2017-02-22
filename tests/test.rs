@@ -4,7 +4,7 @@ extern crate libc;
 use std::path::Path;
 
 use gfapi_sys::gluster::*;
-use libc::{O_CREAT, O_RDWR, O_TRUNC, O_APPEND, SEEK_SET, S_IRWXU};
+use libc::{O_CREAT, O_RDWR, O_TRUNC, O_APPEND, SEEK_SET, S_IRWXU, timespec};
 
 #[test]
 // A simple connect, mkdir, read write ls test.  Should provide a basic level of comfort that
@@ -30,6 +30,15 @@ fn integration_test1() {
     let bytes_read = cluster.read(file_handle, &mut read_buff, 1024, 0).unwrap();
     println!("Read {} bytes from gfapi/test", bytes_read);
     assert_eq!(bytes_written, bytes_read);
+    let file_times = [timespec {
+                          tv_sec: 0,
+                          tv_nsec: 0,
+                      },
+                      timespec {
+                          tv_sec: 0,
+                          tv_nsec: 0,
+                      }];
+    cluster.utimens(&Path::new("gfapi/test"), &file_times).unwrap();
     let d = GlusterDirectory { dir_handle: cluster.opendir(&Path::new("gfapi")).unwrap() };
     for dir_entry in d {
         println!("Dir_entry: {:?}", dir_entry);
