@@ -11,5 +11,3 @@ before_install:
   - sudo apt-get install glusterfs-common glusterfs-server -y
 install:
   - sudo bin/install-gluster.sh
-before_script:
-  - bin/test-bug.sh
