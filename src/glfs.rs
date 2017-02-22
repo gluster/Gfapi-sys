@@ -270,9 +270,9 @@ extern "C" {
     pub fn glfs_chown(fs: *mut glfs_t, path: *const c_char, uid: uid_t, gid: gid_t) -> c_int;
     pub fn glfs_lchown(fs: *mut glfs_t, path: *const c_char, uid: uid_t, gid: gid_t) -> c_int;
     pub fn glfs_fchown(fd: *mut glfs_fd_t, uid: uid_t, gid: gid_t) -> c_int;
-    pub fn glfs_utimens(fs: *mut glfs_t, path: *const c_char, times: *mut timespec) -> c_int;
-    pub fn glfs_lutimens(fs: *mut glfs_t, path: *const c_char, times: *mut timespec) -> c_int;
-    pub fn glfs_futimens(fd: *mut glfs_fd_t, times: *mut timespec) -> c_int;
+    pub fn glfs_utimens(fs: *mut glfs_t, path: *const c_char, times: *const timespec) -> c_int;
+    pub fn glfs_lutimens(fs: *mut glfs_t, path: *const c_char, times: *const timespec) -> c_int;
+    pub fn glfs_futimens(fd: *mut glfs_fd_t, times: *const timespec) -> c_int;
     pub fn glfs_getxattr(fs: *mut glfs_t,
                          path: *const c_char,
                          name: *const c_char,
