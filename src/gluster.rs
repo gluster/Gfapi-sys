@@ -1,6 +1,7 @@
 use errno::{errno, Errno};
 use glfs::*;
-use libc::{c_uchar, c_void, dev_t, dirent, ENOENT, ino_t, mode_t, stat, timespec};
+use libc::{c_uchar, c_void, dev_t, dirent, ENOENT, flock, LOCK_SH, LOCK_EX, LOCK_UN, ino_t,
+           mode_t, stat, timespec};
 use libffi::high::Closure3;
 
 use std::error::Error as err;
@@ -93,6 +94,29 @@ fn get_error() -> String {
     let error = errno();
     format!("{}", error)
 }
+
+/// Apply or remove an advisory lock on the open file.
+pub enum PosixLockCmd {
+    /// Place  an  exclusive  lock.  Only one process may hold an
+    /// exclusive lock for a given file at a given time.
+    Exclusive,
+    /// Place a shared lock. More than one  process may  hold  a shared
+    /// lock for a given file at a given time.
+    Shared,
+    /// Remove an existing lock held by this process.
+    Unlock,
+}
+
+impl Into<i32> for PosixLockCmd {
+    fn into(self) -> i32 {
+        match self {
+            PosixLockCmd::Shared => LOCK_SH,
+            PosixLockCmd::Exclusive => LOCK_EX,
+            PosixLockCmd::Unlock => LOCK_UN,
+        }
+    }
+}
+
 // pub type glfs_io_cbk = ::std::option::Option<extern "C" fn(fd: *mut glfs_fd_t,
 // ret: ssize_t,
 // data: *mut c_void)
@@ -923,6 +947,20 @@ impl Gluster {
                     -> Result<(), GlusterError> {
         unsafe {
             let ret_code = glfs_futimens(file_handle, times);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn posixlock(&self,
+                     file_handle: *mut Struct_glfs_fd,
+                     command: PosixLockCmd,
+                     flock: &mut flock)
+                     -> Result<(), GlusterError> {
+        unsafe {
+            let ret_code = glfs_posix_lock(file_handle, command.into(), flock);
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
