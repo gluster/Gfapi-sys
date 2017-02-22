@@ -968,6 +968,66 @@ impl Gluster {
         Ok(())
     }
 
+    pub fn chmod(&self, path: &Path, mode: mode_t) -> Result<(), GlusterError> {
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
+        unsafe {
+            let ret_code = glfs_chmod(self.cluster_handle, path.as_ptr(), mode);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn fchmod(&self,
+                  file_handle: *mut Struct_glfs_fd,
+                  mode: mode_t)
+                  -> Result<(), GlusterError> {
+        unsafe {
+            let ret_code = glfs_fchmod(file_handle, mode);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn chown(&self, path: &Path, uid: u32, gid: u32) -> Result<(), GlusterError> {
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
+        unsafe {
+            let ret_code = glfs_chown(self.cluster_handle, path.as_ptr(), uid, gid);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn lchown(&self, path: &Path, uid: u32, gid: u32) -> Result<(), GlusterError> {
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
+        unsafe {
+            let ret_code = glfs_lchown(self.cluster_handle, path.as_ptr(), uid, gid);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn fchown(&self,
+                  file_handle: *mut Struct_glfs_fd,
+                  uid: u32,
+                  gid: u32)
+                  -> Result<(), GlusterError> {
+        unsafe {
+            let ret_code = glfs_fchown(file_handle, uid, gid);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
     // pub fn realpath(&self, path: &str) -> Result<String, GlusterError> {
     // let path = try!(CString::new(path));
     // let resolved_path_buf: Vec<u8> = Vec::with_capacity(512);
