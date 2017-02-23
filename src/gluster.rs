@@ -353,7 +353,7 @@ impl Gluster {
 
     pub fn pread(&self,
                  file_handle: *mut Struct_glfs_fd,
-                 fill_buffer: &mut [u8],
+                 fill_buffer: &mut Vec<u8>,
                  count: usize,
                  offset: i64,
                  flags: i32)
@@ -367,6 +367,7 @@ impl Gluster {
             if read_size < 0 {
                 return Err(GlusterError::new(get_error()));
             }
+            fill_buffer.set_len(read_size as usize);
             Ok(read_size)
         }
     }
