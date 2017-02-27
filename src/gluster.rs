@@ -142,6 +142,53 @@ impl Drop for Gluster {
     }
 }
 
+/// This uses readdirplus which is very efficient in Gluster.  In addition
+/// to returning directory entries this also stats each file.
+#[derive(Debug)]
+pub struct GlusterDirectoryPlus {
+    pub dir_handle: *mut Struct_glfs_fd,
+}
+
+pub struct DirEntryPlus {
+    pub path: PathBuf,
+    pub inode: ino_t,
+    pub file_type: c_uchar,
+    pub stat: stat,
+}
+
+impl Iterator for GlusterDirectoryPlus {
+    type Item = DirEntryPlus;
+    fn next(&mut self) -> Option<DirEntryPlus> {
+        let mut dirent: dirent = unsafe { zeroed() };
+        let mut next_entry: *mut dirent = ptr::null_mut();
+        unsafe {
+            let mut stat_buf: stat = zeroed();
+            let ret_code =
+                glfs_readdirplus_r(self.dir_handle, &mut stat_buf, &mut dirent, &mut next_entry);
+            if ret_code < 0 {
+                glfs_closedir(self.dir_handle);
+                return None;
+            }
+            if dirent.d_ino == 0 {
+                // End of stream reached
+                return None;
+            }
+            let telldir_retcode = glfs_telldir(self.dir_handle);
+            if telldir_retcode < 0 {
+                return None;
+            }
+            let file_name = CStr::from_ptr(dirent.d_name.as_ptr());
+            return Some(DirEntryPlus {
+                path: PathBuf::from(file_name.to_string_lossy().into_owned()),
+                inode: dirent.d_ino,
+                file_type: dirent.d_type,
+                stat: stat_buf,
+            });
+        }
+
+    }
+}
+
 #[derive(Debug)]
 pub struct GlusterDirectory {
     pub dir_handle: *mut Struct_glfs_fd,
@@ -261,19 +308,7 @@ impl Gluster {
                 count: usize,
                 flags: i32)
                 -> Result<isize, GlusterError> {
-        unsafe {
-            let read_size = glfs_read(file_handle,
-                                      fill_buffer.as_mut_ptr() as *mut c_void,
-                                      count,
-                                      flags);
-            if read_size < 0 {
-                return Err(GlusterError::new(get_error()));
-            }
-            fill_buffer.set_len(read_size as usize);
-            Ok(read_size)
-
-        }
-
+        self.pread(file_handle, fill_buffer, count, 0, flags)
     }
     pub fn write(&self,
                  file_handle: *mut Struct_glfs_fd,
@@ -353,7 +388,7 @@ impl Gluster {
 
     pub fn pread(&self,
                  file_handle: *mut Struct_glfs_fd,
-                 fill_buffer: &mut Vec<u8>,
+                 fill_buffer: &mut [u8],
                  count: usize,
                  offset: i64,
                  flags: i32)
@@ -367,7 +402,7 @@ impl Gluster {
             if read_size < 0 {
                 return Err(GlusterError::new(get_error()));
             }
-            fill_buffer.set_len(read_size as usize);
+            // fill_buffer.set_len(read_size as usize);
             Ok(read_size)
         }
     }
