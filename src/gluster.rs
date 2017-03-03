@@ -1,7 +1,7 @@
 use errno::{errno, Errno};
 use glfs::*;
-use libc::{c_uchar, c_void, dev_t, dirent, ENOENT, flock, LOCK_SH, LOCK_EX, LOCK_UN, ino_t,
-           mode_t, stat, timespec};
+use libc::{c_uchar, c_void, dev_t, dirent, ENOENT, flock, LOCK_SH, LOCK_EX, LOCK_UN, ino_t, mode_t,
+           stat, timespec};
 use libffi::high::Closure3;
 
 use std::error::Error as err;
@@ -315,16 +315,7 @@ impl Gluster {
                  buffer: &[u8],
                  flags: i32)
                  -> Result<isize, GlusterError> {
-        unsafe {
-            let write_size = glfs_write(file_handle,
-                                        buffer.as_ptr() as *const c_void,
-                                        buffer.len(),
-                                        flags);
-            if write_size < 0 {
-                return Err(GlusterError::new(get_error()));
-            }
-            Ok(write_size)
-        }
+        self.pwrite(file_handle, buffer, buffer.len(), 0, flags)
     }
 
     pub fn write_async<F>(&self,
@@ -386,9 +377,10 @@ impl Gluster {
         }
     }
 
+    /// Read into fill_buffer at offset and return the number of bytes read
     pub fn pread(&self,
                  file_handle: *mut Struct_glfs_fd,
-                 fill_buffer: &mut [u8],
+                 fill_buffer: &mut Vec<u8>,
                  count: usize,
                  offset: i64,
                  flags: i32)
@@ -402,7 +394,7 @@ impl Gluster {
             if read_size < 0 {
                 return Err(GlusterError::new(get_error()));
             }
-            // fill_buffer.set_len(read_size as usize);
+            fill_buffer.set_len(read_size as usize);
             Ok(read_size)
         }
     }
