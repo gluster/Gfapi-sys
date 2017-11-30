@@ -125,10 +125,15 @@ impl Into<i32> for PosixLockCmd {
 // data: *mut c_void)
 // -> ()>;
 //
+
 #[derive(Debug)]
 pub struct Gluster {
     cluster_handle: *mut Struct_glfs,
 }
+
+// As far as I can tell the cluster handle to gluster is thread safe
+unsafe impl Send for Gluster {}
+unsafe impl Sync for Gluster {}
 
 impl Drop for Gluster {
     fn drop(&mut self) {
