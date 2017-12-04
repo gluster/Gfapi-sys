@@ -1,7 +1,7 @@
 use errno::{errno, Errno};
 use glfs::*;
-use libc::{c_uchar, c_void, dev_t, dirent, ENOENT, flock, LOCK_SH, LOCK_EX, LOCK_UN, ino_t,
-           mode_t, stat, timespec};
+use libc::{c_uchar, c_void, dev_t, dirent, DT_DIR, DT_REG, ENOENT, flock, LOCK_SH, LOCK_EX,
+           LOCK_UN, ino_t, mode_t, stat, timespec};
 //use libffi::high::Closure3;
 
 use std::error::Error as err;
@@ -686,6 +686,91 @@ impl Gluster {
         }
         Ok(())
     }
+
+    fn is_empty(&self, p: &Path) -> Result<bool, GlusterError> {
+        let this = Path::new(".");
+        let parent = Path::new("..");
+        let d = GlusterDirectory { dir_handle: self.opendir(&p)? };
+        for dir_entry in d {
+            if dir_entry.path == this || dir_entry.path == parent {
+                continue;
+            }
+            match dir_entry.file_type {
+                // If there's anything in here besides . or .. then return false
+                _ => {
+                    trace!("{:?} is not empty", dir_entry);
+                    return Ok(false);
+                }
+            }
+        }
+
+        Ok(true)
+    }
+
+    /// Removes a directory at this path, after removing all its contents.
+    /// Use carefully!
+    pub fn remove_dir_all(&self, path: &Path) -> Result<(), GlusterError> {
+        trace!("Removing {}", path.display());
+        let mut stack: Vec<PathBuf> = vec![path.to_path_buf()];
+        let mut done = false;
+        let this = Path::new(".");
+        let parent = Path::new("..");
+        while !done {
+            trace!("stack: {:?}", stack);
+            if let Some(mut p) = stack.pop() {
+                if p == PathBuf::from("") {
+                    // short circuit
+                    break;
+                }
+                let d = GlusterDirectory { dir_handle: self.opendir(&p)? };
+                // If there's nothing in there remove the directory
+                if self.is_empty(&p)? {
+                    self.rmdir(&p)?;
+                    continue;
+                }
+                for dir_entry in d {
+                    trace!("dir_entry: {:?}", dir_entry);
+                    if dir_entry.path == this || dir_entry.path == parent {
+                        trace!("Skipping . or .. ");
+                        continue;
+                    }
+                    match dir_entry.file_type {
+                        DT_DIR => {
+                            let mut p = PathBuf::from(&p);
+                            p.push(dir_entry.path);
+                            trace!("pushing: {}", p.display());
+                            stack.push(p);
+                        }
+                        DT_REG => {
+                            let mut p = PathBuf::from(&p);
+                            p.push(dir_entry.path);
+                            trace!("unlink: {}", p.display());
+                            self.unlink(&p)?;
+                        }
+                        _ => {}
+                    }
+                }
+                if stack.len() == 0 {
+                    self.rmdir(&p)?;
+                    // There's a parent directory left to remove
+                    if p.pop() {
+                        stack.push(p);
+                    }
+                }
+            } else {
+                done = true;
+            }
+        }
+
+        // Check if we removed the original directory and exit
+        if self.is_empty(&path)? {
+            trace!("removing {}", path.display());
+            self.rmdir(&path)?;
+        }
+
+        Ok(())
+    }
+
     pub fn rename(&self, oldpath: &Path, newpath: &Path) -> Result<(), GlusterError> {
         let old_path = try!(CString::new(oldpath.as_os_str().as_bytes()));
         let new_path = try!(CString::new(newpath.as_os_str().as_bytes()));
