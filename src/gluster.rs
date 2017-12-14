@@ -720,12 +720,18 @@ impl Gluster {
             if let Some(mut p) = stack.pop() {
                 if p == PathBuf::from("") {
                     // short circuit
+                    trace!("break for PathBuf::from(\"\")");
                     break;
                 }
                 let d = GlusterDirectory { dir_handle: self.opendir(&p)? };
                 // If there's nothing in there remove the directory
                 if self.is_empty(&p)? {
                     self.rmdir(&p)?;
+                    // Remove this dir from the PathBuf
+                    p.pop();
+                    // Push it back onto the working stack because there
+                    // might be more work needed
+                    stack.push(p);
                     continue;
                 }
                 for dir_entry in d {
@@ -765,7 +771,7 @@ impl Gluster {
         // Check if we removed the original directory and exit
         if self.is_empty(&path)? {
             trace!("removing {}", path.display());
-            self.rmdir(&path)?;
+            let _ = self.rmdir(&path);
         }
 
         Ok(())
