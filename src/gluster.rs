@@ -554,7 +554,7 @@ impl Gluster {
                 }
                 return Err(GlusterError::new(get_error()));
             }
-            Ok(false)
+            Ok(true)
         }
     }
 
