@@ -1,7 +1,7 @@
 use errno::{errno, Errno};
 use glfs::*;
 use libc::{c_uchar, c_void, dev_t, dirent, DT_DIR, DT_REG, ENOENT, flock, LOCK_SH, LOCK_EX,
-           LOCK_UN, ino_t, mode_t, stat, timespec};
+           LOCK_UN, ino_t, mode_t, stat, statvfs, timespec};
 //use libffi::high::Closure3;
 
 use std::error::Error as err;
@@ -555,6 +555,18 @@ impl Gluster {
                 return Err(GlusterError::new(get_error()));
             }
             Ok(true)
+        }
+    }
+
+    pub fn statvfs(&self, path: &Path) -> Result<statvfs, GlusterError> {
+        let path = try!(CString::new(path.as_os_str().as_bytes()));
+        unsafe {
+            let mut stat_buf: statvfs = zeroed();
+            let ret_code = glfs_statvfs(self.cluster_handle, path.as_ptr(), &mut stat_buf);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+            Ok(stat_buf)
         }
     }
 

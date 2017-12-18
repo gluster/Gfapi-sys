@@ -1,15 +1,17 @@
 #![allow(non_camel_case_types)]
 use libc::{c_char, c_int, c_long, c_void, dev_t, dirent, gid_t, flock, mode_t, off_t, size_t,
-           stat, ssize_t, timespec, uid_t};
+           stat, ssize_t, statvfs, timespec, uid_t};
 
 pub enum Struct_glfs { }
 pub type glfs_t = Struct_glfs;
 pub enum Struct_glfs_fd { }
 pub type glfs_fd_t = Struct_glfs_fd;
-pub type glfs_io_cbk = ::std::option::Option<extern "C" fn(fd: *mut glfs_fd_t,
-                                                             ret: ssize_t,
-                                                             data: *mut c_void)
-                                                             -> ()>;
+pub type glfs_io_cbk = ::std::option::Option<
+    extern "C" fn(fd: *mut glfs_fd_t,
+                  ret: ssize_t,
+                  data: *mut c_void)
+                  -> (),
+>;
 
 #[repr(C)]
 pub struct iovec {
@@ -43,16 +45,18 @@ extern "C" {
     /// mount' object as it maintains a connection to glusterd and polls on
     /// configuration change notifications.
     ///  This is incompatible with glfs_set_volfile().
-    pub fn glfs_set_volfile_server(fs: *mut glfs_t,
-                                   transport: *const c_char,
-                                   host: *const c_char,
-                                   port: c_int)
-                                   -> c_int;
-    pub fn glfs_unset_volfile_server(fs: *mut glfs_t,
-                                     transport: *const c_char,
-                                     host: *const c_char,
-                                     port: c_int)
-                                     -> c_int;
+    pub fn glfs_set_volfile_server(
+        fs: *mut glfs_t,
+        transport: *const c_char,
+        host: *const c_char,
+        port: c_int,
+    ) -> c_int;
+    pub fn glfs_unset_volfile_server(
+        fs: *mut glfs_t,
+        transport: *const c_char,
+        host: *const c_char,
+        port: c_int,
+    ) -> c_int;
     ///  This function specifies logging parameters for the virtual mount.
     /// Default log file is /dev/null.
     pub fn glfs_set_logging(fs: *mut glfs_t, logfile: *const c_char, loglevel: c_int) -> c_int;
@@ -92,126 +96,144 @@ extern "C" {
     /// This function opens a file on a virtual mount.
     pub fn glfs_open(fs: *mut glfs_t, path: *const c_char, flags: c_int) -> *mut glfs_fd_t;
     /// This function opens a file on a virtual mount.
-    pub fn glfs_creat(fs: *mut glfs_t,
-                      path: *const c_char,
-                      flags: c_int,
-                      mode: mode_t)
-                      -> *mut glfs_fd_t;
+    pub fn glfs_creat(
+        fs: *mut glfs_t,
+        path: *const c_char,
+        flags: c_int,
+        mode: mode_t,
+    ) -> *mut glfs_fd_t;
     pub fn glfs_close(fd: *mut glfs_fd_t) -> c_int;
     pub fn glfs_from_glfd(fd: *mut glfs_fd_t) -> *mut glfs_t;
-    pub fn glfs_set_xlator_option(fs: *mut glfs_t,
-                                  xlator: *const c_char,
-                                  key: *const c_char,
-                                  value: *const c_char)
-                                  -> c_int;
+    pub fn glfs_set_xlator_option(
+        fs: *mut glfs_t,
+        xlator: *const c_char,
+        key: *const c_char,
+        value: *const c_char,
+    ) -> c_int;
     pub fn glfs_read(fd: *mut glfs_fd_t, buf: *mut c_void, count: size_t, flags: c_int) -> ssize_t;
-    pub fn glfs_write(fd: *mut glfs_fd_t,
-                      buf: *const c_void,
-                      count: size_t,
-                      flags: c_int)
-                      -> ssize_t;
-    pub fn glfs_read_async(fd: *mut glfs_fd_t,
-                           buf: *mut c_void,
-                           count: size_t,
-                           flags: c_int,
-                           _fn: glfs_io_cbk,
-                           data: *mut c_void)
-                           -> c_int;
-    pub fn glfs_write_async(fd: *mut glfs_fd_t,
-                            buf: *const c_void,
-                            count: size_t,
-                            flags: c_int,
-                            _fn: glfs_io_cbk,
-                            data: *mut c_void)
-                            -> c_int;
-    pub fn glfs_readv(fd: *mut glfs_fd_t,
-                      iov: *const iovec,
-                      iovcnt: c_int,
-                      flags: c_int)
-                      -> ssize_t;
-    pub fn glfs_writev(fd: *mut glfs_fd_t,
-                       iov: *const iovec,
-                       iovcnt: c_int,
-                       flags: c_int)
-                       -> ssize_t;
-    pub fn glfs_readv_async(fd: *mut glfs_fd_t,
-                            iov: *const iovec,
-                            count: c_int,
-                            flags: c_int,
-                            _fn: glfs_io_cbk,
-                            data: *mut c_void)
-                            -> c_int;
-    pub fn glfs_writev_async(fd: *mut glfs_fd_t,
-                             iov: *const iovec,
-                             count: c_int,
-                             flags: c_int,
-                             _fn: glfs_io_cbk,
-                             data: *mut c_void)
-                             -> c_int;
-    pub fn glfs_pread(fd: *mut glfs_fd_t,
-                      buf: *mut c_void,
-                      count: size_t,
-                      offset: off_t,
-                      flags: c_int)
-                      -> ssize_t;
-    pub fn glfs_pwrite(fd: *mut glfs_fd_t,
-                       buf: *const c_void,
-                       count: size_t,
-                       offset: off_t,
-                       flags: c_int)
-                       -> ssize_t;
-    pub fn glfs_pread_async(fd: *mut glfs_fd_t,
-                            buf: *mut c_void,
-                            count: size_t,
-                            offset: off_t,
-                            flags: c_int,
-                            _fn: glfs_io_cbk,
-                            data: *mut c_void)
-                            -> c_int;
-    pub fn glfs_pwrite_async(fd: *mut glfs_fd_t,
-                             buf: *const c_void,
-                             count: c_int,
-                             offset: off_t,
-                             flags: c_int,
-                             _fn: glfs_io_cbk,
-                             data: *mut c_void)
-                             -> c_int;
-    pub fn glfs_preadv(fd: *mut glfs_fd_t,
-                       iov: *const iovec,
-                       iovcnt: c_int,
-                       offset: off_t,
-                       flags: c_int)
-                       -> ssize_t;
-    pub fn glfs_pwritev(fd: *mut glfs_fd_t,
-                        iov: *const iovec,
-                        iovcnt: c_int,
-                        offset: off_t,
-                        flags: c_int)
-                        -> ssize_t;
-    pub fn glfs_preadv_async(fd: *mut glfs_fd_t,
-                             iov: *const iovec,
-                             count: c_int,
-                             offset: off_t,
-                             flags: c_int,
-                             _fn: glfs_io_cbk,
-                             data: *mut c_void)
-                             -> c_int;
-    pub fn glfs_pwritev_async(fd: *mut glfs_fd_t,
-                              iov: *const iovec,
-                              count: c_int,
-                              offset: off_t,
-                              flags: c_int,
-                              _fn: glfs_io_cbk,
-                              data: *mut c_void)
-                              -> c_int;
+    pub fn glfs_write(
+        fd: *mut glfs_fd_t,
+        buf: *const c_void,
+        count: size_t,
+        flags: c_int,
+    ) -> ssize_t;
+    pub fn glfs_read_async(
+        fd: *mut glfs_fd_t,
+        buf: *mut c_void,
+        count: size_t,
+        flags: c_int,
+        _fn: glfs_io_cbk,
+        data: *mut c_void,
+    ) -> c_int;
+    pub fn glfs_write_async(
+        fd: *mut glfs_fd_t,
+        buf: *const c_void,
+        count: size_t,
+        flags: c_int,
+        _fn: glfs_io_cbk,
+        data: *mut c_void,
+    ) -> c_int;
+    pub fn glfs_readv(
+        fd: *mut glfs_fd_t,
+        iov: *const iovec,
+        iovcnt: c_int,
+        flags: c_int,
+    ) -> ssize_t;
+    pub fn glfs_writev(
+        fd: *mut glfs_fd_t,
+        iov: *const iovec,
+        iovcnt: c_int,
+        flags: c_int,
+    ) -> ssize_t;
+    pub fn glfs_readv_async(
+        fd: *mut glfs_fd_t,
+        iov: *const iovec,
+        count: c_int,
+        flags: c_int,
+        _fn: glfs_io_cbk,
+        data: *mut c_void,
+    ) -> c_int;
+    pub fn glfs_writev_async(
+        fd: *mut glfs_fd_t,
+        iov: *const iovec,
+        count: c_int,
+        flags: c_int,
+        _fn: glfs_io_cbk,
+        data: *mut c_void,
+    ) -> c_int;
+    pub fn glfs_pread(
+        fd: *mut glfs_fd_t,
+        buf: *mut c_void,
+        count: size_t,
+        offset: off_t,
+        flags: c_int,
+    ) -> ssize_t;
+    pub fn glfs_pwrite(
+        fd: *mut glfs_fd_t,
+        buf: *const c_void,
+        count: size_t,
+        offset: off_t,
+        flags: c_int,
+    ) -> ssize_t;
+    pub fn glfs_pread_async(
+        fd: *mut glfs_fd_t,
+        buf: *mut c_void,
+        count: size_t,
+        offset: off_t,
+        flags: c_int,
+        _fn: glfs_io_cbk,
+        data: *mut c_void,
+    ) -> c_int;
+    pub fn glfs_pwrite_async(
+        fd: *mut glfs_fd_t,
+        buf: *const c_void,
+        count: c_int,
+        offset: off_t,
+        flags: c_int,
+        _fn: glfs_io_cbk,
+        data: *mut c_void,
+    ) -> c_int;
+    pub fn glfs_preadv(
+        fd: *mut glfs_fd_t,
+        iov: *const iovec,
+        iovcnt: c_int,
+        offset: off_t,
+        flags: c_int,
+    ) -> ssize_t;
+    pub fn glfs_pwritev(
+        fd: *mut glfs_fd_t,
+        iov: *const iovec,
+        iovcnt: c_int,
+        offset: off_t,
+        flags: c_int,
+    ) -> ssize_t;
+    pub fn glfs_preadv_async(
+        fd: *mut glfs_fd_t,
+        iov: *const iovec,
+        count: c_int,
+        offset: off_t,
+        flags: c_int,
+        _fn: glfs_io_cbk,
+        data: *mut c_void,
+    ) -> c_int;
+    pub fn glfs_pwritev_async(
+        fd: *mut glfs_fd_t,
+        iov: *const iovec,
+        count: c_int,
+        offset: off_t,
+        flags: c_int,
+        _fn: glfs_io_cbk,
+        data: *mut c_void,
+    ) -> c_int;
     pub fn glfs_lseek(fd: *mut glfs_fd_t, offset: off_t, whence: c_int) -> off_t;
     pub fn glfs_truncate(fs: *mut glfs_t, path: *const c_char, length: off_t) -> c_int;
     pub fn glfs_ftruncate(fd: *mut glfs_fd_t, length: off_t) -> c_int;
-    pub fn glfs_ftruncate_async(fd: *mut glfs_fd_t,
-                                length: off_t,
-                                _fn: glfs_io_cbk,
-                                data: *mut c_void)
-                                -> c_int;
+    pub fn glfs_ftruncate_async(
+        fd: *mut glfs_fd_t,
+        length: off_t,
+        _fn: glfs_io_cbk,
+        data: *mut c_void,
+    ) -> c_int;
     pub fn glfs_lstat(fs: *mut glfs_t, path: *const c_char, buf: *mut stat) -> c_int;
     pub fn glfs_stat(fs: *mut glfs_t, path: *const c_char, buf: *mut stat) -> c_int;
     pub fn glfs_fstat(fd: *mut glfs_fd_t, buf: *mut stat) -> c_int;
@@ -221,11 +243,12 @@ extern "C" {
     pub fn glfs_fdatasync_async(fd: *mut glfs_fd_t, _fn: glfs_io_cbk, data: *mut c_void) -> c_int;
     pub fn glfs_access(fs: *mut glfs_t, path: *const c_char, mode: c_int) -> c_int;
     pub fn glfs_symlink(fs: *mut glfs_t, oldpath: *const c_char, newpath: *const c_char) -> c_int;
-    pub fn glfs_readlink(fs: *mut glfs_t,
-                         path: *const c_char,
-                         buf: *mut c_char,
-                         bufsiz: size_t)
-                         -> c_int;
+    pub fn glfs_readlink(
+        fs: *mut glfs_t,
+        path: *const c_char,
+        buf: *mut c_char,
+        bufsiz: size_t,
+    ) -> c_int;
     pub fn glfs_mknod(fs: *mut glfs_t, path: *const c_char, mode: mode_t, dev: dev_t) -> c_int;
     pub fn glfs_mkdir(fs: *mut glfs_t, path: *const c_char, mode: mode_t) -> c_int;
     pub fn glfs_unlink(fs: *mut glfs_t, path: *const c_char) -> c_int;
@@ -239,20 +262,22 @@ extern "C" {
     /// before calling the APIs. 512 byte buffer (for dirent) is sufficient for
     /// all known systems which are tested againt glusterfs/gfapi, but may be
     /// insufficient in the future.
-    pub fn glfs_readdir_r(fd: *mut glfs_fd_t,
-                          dirent: *mut dirent,
-                          result: *mut *mut dirent)
-                          -> c_int;
+    pub fn glfs_readdir_r(
+        fd: *mut glfs_fd_t,
+        dirent: *mut dirent,
+        result: *mut *mut dirent,
+    ) -> c_int;
     /// glfs_readdir_r and glfs_readdirplus_r ARE thread safe AND re-entrant,
     /// but the interface has ambiguity about the size of dirent to be allocated
     /// before calling the APIs. 512 byte buffer (for dirent) is sufficient for
     /// all known systems which are tested againt glusterfs/gfapi, but may be
     /// insufficient in the future.
-    pub fn glfs_readdirplus_r(fd: *mut glfs_fd_t,
-                              stat: *mut stat,
-                              dirent: *mut dirent,
-                              result: *mut *mut dirent)
-                              -> c_int;
+    pub fn glfs_readdirplus_r(
+        fd: *mut glfs_fd_t,
+        stat: *mut stat,
+        dirent: *mut dirent,
+        result: *mut *mut dirent,
+    ) -> c_int;
 
     /// glfs_readdir and glfs_readdirplus are NEITHER thread safe NOR re-entrant
     /// when called on the same directory handle. However they ARE thread safe
@@ -263,8 +288,7 @@ extern "C" {
     pub fn glfs_telldir(fd: *mut glfs_fd_t) -> c_long;
     pub fn glfs_seekdir(fd: *mut glfs_fd_t, offset: c_long) -> ();
     pub fn glfs_closedir(fd: *mut glfs_fd_t) -> c_int;
-    // pub fn glfs_statvfs(fs: *mut glfs_t, path: *const c_char,
-    //                    buf: *mut Struct_statvfs) -> c_int;
+    pub fn glfs_statvfs(fs: *mut glfs_t, path: *const c_char, buf: *mut statvfs) -> c_int;
     pub fn glfs_chmod(fs: *mut glfs_t, path: *const c_char, mode: mode_t) -> c_int;
     pub fn glfs_fchmod(fd: *mut glfs_fd_t, mode: mode_t) -> c_int;
     pub fn glfs_chown(fs: *mut glfs_t, path: *const c_char, uid: uid_t, gid: gid_t) -> c_int;
@@ -273,83 +297,95 @@ extern "C" {
     pub fn glfs_utimens(fs: *mut glfs_t, path: *const c_char, times: *const timespec) -> c_int;
     pub fn glfs_lutimens(fs: *mut glfs_t, path: *const c_char, times: *const timespec) -> c_int;
     pub fn glfs_futimens(fd: *mut glfs_fd_t, times: *const timespec) -> c_int;
-    pub fn glfs_getxattr(fs: *mut glfs_t,
-                         path: *const c_char,
-                         name: *const c_char,
-                         value: *mut c_void,
-                         size: size_t)
-                         -> ssize_t;
-    pub fn glfs_lgetxattr(fs: *mut glfs_t,
-                          path: *const c_char,
-                          name: *const c_char,
-                          value: *mut c_void,
-                          size: size_t)
-                          -> ssize_t;
-    pub fn glfs_fgetxattr(fd: *mut glfs_fd_t,
-                          name: *const c_char,
-                          value: *mut c_void,
-                          size: size_t)
-                          -> ssize_t;
-    pub fn glfs_listxattr(fs: *mut glfs_t,
-                          path: *const c_char,
-                          value: *mut c_void,
-                          size: size_t)
-                          -> ssize_t;
-    pub fn glfs_llistxattr(fs: *mut glfs_t,
-                           path: *const c_char,
-                           value: *mut c_void,
-                           size: size_t)
-                           -> ssize_t;
+    pub fn glfs_getxattr(
+        fs: *mut glfs_t,
+        path: *const c_char,
+        name: *const c_char,
+        value: *mut c_void,
+        size: size_t,
+    ) -> ssize_t;
+    pub fn glfs_lgetxattr(
+        fs: *mut glfs_t,
+        path: *const c_char,
+        name: *const c_char,
+        value: *mut c_void,
+        size: size_t,
+    ) -> ssize_t;
+    pub fn glfs_fgetxattr(
+        fd: *mut glfs_fd_t,
+        name: *const c_char,
+        value: *mut c_void,
+        size: size_t,
+    ) -> ssize_t;
+    pub fn glfs_listxattr(
+        fs: *mut glfs_t,
+        path: *const c_char,
+        value: *mut c_void,
+        size: size_t,
+    ) -> ssize_t;
+    pub fn glfs_llistxattr(
+        fs: *mut glfs_t,
+        path: *const c_char,
+        value: *mut c_void,
+        size: size_t,
+    ) -> ssize_t;
     pub fn glfs_flistxattr(fd: *mut glfs_fd_t, value: *mut c_void, size: size_t) -> ssize_t;
-    pub fn glfs_setxattr(fs: *mut glfs_t,
-                         path: *const c_char,
-                         name: *const c_char,
-                         value: *const c_void,
-                         size: size_t,
-                         flags: c_int)
-                         -> c_int;
-    pub fn glfs_lsetxattr(fs: *mut glfs_t,
-                          path: *const c_char,
-                          name: *const c_char,
-                          value: *const c_void,
-                          size: size_t,
-                          flags: c_int)
-                          -> c_int;
-    pub fn glfs_fsetxattr(fd: *mut glfs_fd_t,
-                          name: *const c_char,
-                          value: *const c_void,
-                          size: size_t,
-                          flags: c_int)
-                          -> c_int;
+    pub fn glfs_setxattr(
+        fs: *mut glfs_t,
+        path: *const c_char,
+        name: *const c_char,
+        value: *const c_void,
+        size: size_t,
+        flags: c_int,
+    ) -> c_int;
+    pub fn glfs_lsetxattr(
+        fs: *mut glfs_t,
+        path: *const c_char,
+        name: *const c_char,
+        value: *const c_void,
+        size: size_t,
+        flags: c_int,
+    ) -> c_int;
+    pub fn glfs_fsetxattr(
+        fd: *mut glfs_fd_t,
+        name: *const c_char,
+        value: *const c_void,
+        size: size_t,
+        flags: c_int,
+    ) -> c_int;
     pub fn glfs_removexattr(fs: *mut glfs_t, path: *const c_char, name: *const c_char) -> c_int;
     pub fn glfs_lremovexattr(fs: *mut glfs_t, path: *const c_char, name: *const c_char) -> c_int;
     pub fn glfs_fremovexattr(fd: *mut glfs_fd_t, name: *const c_char) -> c_int;
-    pub fn glfs_fallocate(fd: *mut glfs_fd_t,
-                          keep_size: c_int,
-                          offset: off_t,
-                          len: size_t)
-                          -> c_int;
+    pub fn glfs_fallocate(
+        fd: *mut glfs_fd_t,
+        keep_size: c_int,
+        offset: off_t,
+        len: size_t,
+    ) -> c_int;
     pub fn glfs_discard(fd: *mut glfs_fd_t, offset: off_t, len: size_t) -> c_int;
-    pub fn glfs_discard_async(fd: *mut glfs_fd_t,
-                              length: off_t,
-                              lent: size_t,
-                              _fn: glfs_io_cbk,
-                              data: *mut c_void)
-                              -> c_int;
+    pub fn glfs_discard_async(
+        fd: *mut glfs_fd_t,
+        length: off_t,
+        lent: size_t,
+        _fn: glfs_io_cbk,
+        data: *mut c_void,
+    ) -> c_int;
     pub fn glfs_zerofill(fd: *mut glfs_fd_t, offset: off_t, len: off_t) -> c_int;
-    pub fn glfs_zerofill_async(fd: *mut glfs_fd_t,
-                               length: off_t,
-                               len: off_t,
-                               _fn: glfs_io_cbk,
-                               data: *mut c_void)
-                               -> c_int;
+    pub fn glfs_zerofill_async(
+        fd: *mut glfs_fd_t,
+        length: off_t,
+        len: off_t,
+        _fn: glfs_io_cbk,
+        data: *mut c_void,
+    ) -> c_int;
     pub fn glfs_getcwd(fs: *mut glfs_t, buf: *mut c_char, size: size_t) -> *mut c_char;
     pub fn glfs_chdir(fs: *mut glfs_t, path: *const c_char) -> c_int;
     pub fn glfs_fchdir(fd: *mut glfs_fd_t) -> c_int;
-    pub fn glfs_realpath(fs: *mut glfs_t,
-                         path: *const c_char,
-                         resolved_path: *mut c_char)
-                         -> *mut c_char;
+    pub fn glfs_realpath(
+        fs: *mut glfs_t,
+        path: *const c_char,
+        resolved_path: *mut c_char,
+    ) -> *mut c_char;
     pub fn glfs_posix_lock(fd: *mut glfs_fd_t, cmd: c_int, flock: *mut flock) -> c_int;
     pub fn glfs_dup(fd: *mut glfs_fd_t) -> *mut glfs_fd_t;
 }
