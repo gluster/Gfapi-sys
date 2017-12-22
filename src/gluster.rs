@@ -1,8 +1,8 @@
 use errno::{errno, Errno};
 use glfs::*;
-use libc::{c_uchar, c_void, dev_t, dirent, DT_DIR, DT_REG, ENOENT, flock, LOCK_SH, LOCK_EX,
-           LOCK_UN, ino_t, mode_t, stat, statvfs, timespec};
-//use libffi::high::Closure3;
+use libc::{c_uchar, c_void, dev_t, dirent, flock, ino_t, mode_t, stat, statvfs, timespec, DT_DIR,
+           DT_REG, ENOENT, LOCK_EX, LOCK_SH, LOCK_UN};
+use uuid::{ParseError, Uuid};
 
 use std::error::Error as err;
 use std::mem::zeroed;
@@ -17,11 +17,12 @@ use std::string::FromUtf8Error;
 /// Custom error handling for the library
 #[derive(Debug)]
 pub enum GlusterError {
-    FromUtf8Error(FromUtf8Error),
-    NulError(NulError),
     Error(String),
-    IoError(Error),
+    FromUtf8Error(FromUtf8Error),
     IntoStringError(IntoStringError),
+    IoError(Error),
+    NulError(NulError),
+    ParseError(ParseError),
 }
 
 impl fmt::Display for GlusterError {
@@ -33,20 +34,22 @@ impl fmt::Display for GlusterError {
 impl err for GlusterError {
     fn description(&self) -> &str {
         match *self {
-            GlusterError::FromUtf8Error(ref e) => e.description(),
-            GlusterError::NulError(ref e) => e.description(),
             GlusterError::Error(ref e) => &e,
-            GlusterError::IoError(ref e) => e.description(),
+            GlusterError::FromUtf8Error(ref e) => e.description(),
             GlusterError::IntoStringError(ref e) => e.description(),
+            GlusterError::IoError(ref e) => e.description(),
+            GlusterError::NulError(ref e) => e.description(),
+            GlusterError::ParseError(ref e) => e.description(),
         }
     }
     fn cause(&self) -> Option<&err> {
         match *self {
-            GlusterError::FromUtf8Error(ref e) => e.cause(),
-            GlusterError::NulError(ref e) => e.cause(),
             GlusterError::Error(_) => None,
-            GlusterError::IoError(ref e) => e.cause(),
+            GlusterError::FromUtf8Error(ref e) => e.cause(),
             GlusterError::IntoStringError(ref e) => e.cause(),
+            GlusterError::IoError(ref e) => e.cause(),
+            GlusterError::NulError(ref e) => e.cause(),
+            GlusterError::ParseError(ref e) => e.cause(),
         }
     }
 }
@@ -59,11 +62,12 @@ impl GlusterError {
     /// Convert a GlusterError into a String representation.
     pub fn to_string(&self) -> String {
         match *self {
-            GlusterError::FromUtf8Error(ref err) => err.utf8_error().to_string(),
-            GlusterError::NulError(ref err) => err.description().to_string(),
             GlusterError::Error(ref err) => err.to_string(),
-            GlusterError::IoError(ref err) => err.description().to_string(),
+            GlusterError::FromUtf8Error(ref err) => err.utf8_error().to_string(),
             GlusterError::IntoStringError(ref err) => err.description().to_string(),
+            GlusterError::IoError(ref err) => err.description().to_string(),
+            GlusterError::NulError(ref err) => err.description().to_string(),
+            GlusterError::ParseError(ref err) => err.description().to_string(),
         }
     }
 }
@@ -79,14 +83,22 @@ impl From<FromUtf8Error> for GlusterError {
         GlusterError::FromUtf8Error(err)
     }
 }
+
 impl From<IntoStringError> for GlusterError {
     fn from(err: IntoStringError) -> GlusterError {
         GlusterError::IntoStringError(err)
     }
 }
+
 impl From<Error> for GlusterError {
     fn from(err: Error) -> GlusterError {
         GlusterError::IoError(err)
+    }
+}
+
+impl From<ParseError> for GlusterError {
+    fn from(err: ParseError) -> GlusterError {
+        GlusterError::ParseError(err)
     }
 }
 
@@ -190,7 +202,6 @@ impl Iterator for GlusterDirectoryPlus {
                 stat: stat_buf,
             });
         }
-
     }
 }
 
@@ -232,7 +243,6 @@ impl Iterator for GlusterDirectory {
                 file_type: dirent.d_type,
             });
         }
-
     }
 }
 
@@ -262,7 +272,9 @@ impl Gluster {
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
-            Ok(Gluster { cluster_handle: cluster_handle })
+            Ok(Gluster {
+                cluster_handle: cluster_handle,
+            })
         }
     }
 
@@ -279,6 +291,28 @@ impl Gluster {
             glfs_fini(self.cluster_handle);
         }
     }
+
+    /// Fetch the volume uuid from the glusterd management server
+    pub fn get_volume_id(&self) -> Result<Uuid, GlusterError> {
+        // Give it plenty of room
+        let mut buff: Vec<u8> = Vec::with_capacity(128);
+
+        unsafe {
+            let ret_code = glfs_get_volumeid(
+                self.cluster_handle,
+                buff.as_mut_ptr() as *mut i8,
+                buff.capacity(),
+            );
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+            // Inform Rust how many bytes gluster copied into the buffer
+            buff.set_len(ret_code as usize);
+        }
+        let uuid = Uuid::from_bytes(&buff)?;
+        Ok(uuid)
+    }
+
     pub fn open(&self, path: &Path, flags: i32) -> Result<*mut Struct_glfs_fd, GlusterError> {
         let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
@@ -375,7 +409,6 @@ impl Gluster {
                 return Err(GlusterError::new(get_error()));
             }
             Ok(read_size)
-
         }
     }
     pub fn writev(
@@ -395,7 +428,6 @@ impl Gluster {
                 return Err(GlusterError::new(get_error()));
             }
             Ok(write_size)
-
         }
     }
 
@@ -443,7 +475,6 @@ impl Gluster {
                 return Err(GlusterError::new(get_error()));
             }
             Ok(write_size)
-
         }
     }
 
@@ -502,9 +533,7 @@ impl Gluster {
                 return Err(GlusterError::new(get_error()));
             }
             Ok(file_offset)
-
         }
-
     }
     pub fn truncate(&self, path: &Path, length: i64) -> Result<(), GlusterError> {
         let path = try!(CString::new(path.as_os_str().as_bytes()));
@@ -580,7 +609,6 @@ impl Gluster {
             }
             Ok(stat_buf)
         }
-
     }
     pub fn fstat(&self, file_handle: *mut Struct_glfs_fd) -> Result<stat, GlusterError> {
         unsafe {
@@ -608,7 +636,6 @@ impl Gluster {
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
-
         }
         Ok(())
     }
@@ -619,7 +646,6 @@ impl Gluster {
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
-
         }
         Ok(())
     }
@@ -632,7 +658,6 @@ impl Gluster {
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
-
         }
         Ok(())
     }
@@ -660,7 +685,6 @@ impl Gluster {
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
-
         }
         Ok(())
     }
@@ -672,7 +696,6 @@ impl Gluster {
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
-
         }
         Ok(())
     }
@@ -684,7 +707,6 @@ impl Gluster {
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
-
         }
         Ok(())
     }
@@ -702,7 +724,9 @@ impl Gluster {
     fn is_empty(&self, p: &Path) -> Result<bool, GlusterError> {
         let this = Path::new(".");
         let parent = Path::new("..");
-        let d = GlusterDirectory { dir_handle: self.opendir(&p)? };
+        let d = GlusterDirectory {
+            dir_handle: self.opendir(&p)?,
+        };
         for dir_entry in d {
             if dir_entry.path == this || dir_entry.path == parent {
                 continue;
@@ -735,7 +759,9 @@ impl Gluster {
                     trace!("break for PathBuf::from(\"\")");
                     break;
                 }
-                let d = GlusterDirectory { dir_handle: self.opendir(&p)? };
+                let d = GlusterDirectory {
+                    dir_handle: self.opendir(&p)?,
+                };
                 // If there's nothing in there remove the directory
                 if self.is_empty(&p)? {
                     self.rmdir(&p)?;
