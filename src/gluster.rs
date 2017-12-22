@@ -1,7 +1,7 @@
 use errno::{errno, Errno};
 use glfs::*;
-use libc::{c_uchar, c_void, dev_t, dirent, DT_DIR, DT_REG, ENOENT, flock, LOCK_SH, LOCK_EX,
-           LOCK_UN, ino_t, mode_t, stat, statvfs, timespec};
+use libc::{c_uchar, c_void, dev_t, dirent, flock, ino_t, mode_t, stat, statvfs, timespec, DT_DIR,
+           DT_REG, ENOENT, LOCK_EX, LOCK_SH, LOCK_UN};
 //use libffi::high::Closure3;
 
 use std::error::Error as err;
@@ -190,7 +190,6 @@ impl Iterator for GlusterDirectoryPlus {
                 stat: stat_buf,
             });
         }
-
     }
 }
 
@@ -232,7 +231,6 @@ impl Iterator for GlusterDirectory {
                 file_type: dirent.d_type,
             });
         }
-
     }
 }
 
@@ -262,7 +260,9 @@ impl Gluster {
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
-            Ok(Gluster { cluster_handle: cluster_handle })
+            Ok(Gluster {
+                cluster_handle: cluster_handle,
+            })
         }
     }
 
@@ -375,7 +375,6 @@ impl Gluster {
                 return Err(GlusterError::new(get_error()));
             }
             Ok(read_size)
-
         }
     }
     pub fn writev(
@@ -395,7 +394,6 @@ impl Gluster {
                 return Err(GlusterError::new(get_error()));
             }
             Ok(write_size)
-
         }
     }
 
@@ -443,7 +441,6 @@ impl Gluster {
                 return Err(GlusterError::new(get_error()));
             }
             Ok(write_size)
-
         }
     }
 
@@ -502,9 +499,7 @@ impl Gluster {
                 return Err(GlusterError::new(get_error()));
             }
             Ok(file_offset)
-
         }
-
     }
     pub fn truncate(&self, path: &Path, length: i64) -> Result<(), GlusterError> {
         let path = try!(CString::new(path.as_os_str().as_bytes()));
@@ -580,7 +575,6 @@ impl Gluster {
             }
             Ok(stat_buf)
         }
-
     }
     pub fn fstat(&self, file_handle: *mut Struct_glfs_fd) -> Result<stat, GlusterError> {
         unsafe {
@@ -608,7 +602,6 @@ impl Gluster {
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
-
         }
         Ok(())
     }
@@ -619,7 +612,6 @@ impl Gluster {
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
-
         }
         Ok(())
     }
@@ -632,7 +624,6 @@ impl Gluster {
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
-
         }
         Ok(())
     }
@@ -660,7 +651,6 @@ impl Gluster {
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
-
         }
         Ok(())
     }
@@ -672,7 +662,6 @@ impl Gluster {
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
-
         }
         Ok(())
     }
@@ -684,7 +673,6 @@ impl Gluster {
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
-
         }
         Ok(())
     }
@@ -702,7 +690,9 @@ impl Gluster {
     fn is_empty(&self, p: &Path) -> Result<bool, GlusterError> {
         let this = Path::new(".");
         let parent = Path::new("..");
-        let d = GlusterDirectory { dir_handle: self.opendir(&p)? };
+        let d = GlusterDirectory {
+            dir_handle: self.opendir(&p)?,
+        };
         for dir_entry in d {
             if dir_entry.path == this || dir_entry.path == parent {
                 continue;
@@ -735,7 +725,9 @@ impl Gluster {
                     trace!("break for PathBuf::from(\"\")");
                     break;
                 }
-                let d = GlusterDirectory { dir_handle: self.opendir(&p)? };
+                let d = GlusterDirectory {
+                    dir_handle: self.opendir(&p)?,
+                };
                 // If there's nothing in there remove the directory
                 if self.is_empty(&p)? {
                     self.rmdir(&p)?;
