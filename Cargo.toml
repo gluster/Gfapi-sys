@@ -13,6 +13,10 @@ libc = "^0.2"
 log = "~0.3"
 uuid = {version="~0.4", features=["use_std"]}
 
+[badges]
+travis-ci = { repository = "gluster/Gfapi-sys" }
+
+
 [profile.dev]
 opt-level = 0      # controls the `--opt-level` the compiler builds with
 debug = true       # controls whether the compiler passes `-g`
