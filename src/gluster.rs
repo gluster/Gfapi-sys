@@ -1,7 +1,7 @@
 use errno::{errno, Errno};
 use glfs::*;
 use libc::{c_uchar, c_void, dev_t, dirent, flock, ino_t, mode_t, stat, statvfs, timespec, DT_DIR,
-           DT_REG, ENOENT, LOCK_EX, LOCK_SH, LOCK_UN};
+           ENOENT, LOCK_EX, LOCK_SH, LOCK_UN};
 use uuid::{ParseError, Uuid};
 
 use std::error::Error as err;
@@ -784,14 +784,15 @@ impl Gluster {
                             p.push(dir_entry.path);
                             trace!("pushing: {}", p.display());
                             stack.push(p);
-                        }
-                        DT_REG => {
+                        },
+                        _ => {
+                            // Everything else gets unlinked
+                            // chr, fifo, file, socket, symlink
                             let mut p = PathBuf::from(&p);
                             p.push(dir_entry.path);
                             trace!("unlink: {}", p.display());
                             self.unlink(&p)?;
                         }
-                        _ => {}
                     }
                 }
                 if stack.len() == 0 {
