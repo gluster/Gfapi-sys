@@ -11,7 +11,7 @@ license = "MIT"
 errno = "^0.2"
 libc = "^0.2"
 log = "~0.3"
-uuid = {version="~0.4", features=["use_std"]}
+uuid = {version="0.6", features=["std"]}
 
 [badges]
 travis-ci = { repository = "gluster/Gfapi-sys" }
