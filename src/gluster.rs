@@ -784,7 +784,7 @@ impl Gluster {
                             p.push(dir_entry.path);
                             trace!("pushing: {}", p.display());
                             stack.push(p);
-                        },
+                        }
                         _ => {
                             // Everything else gets unlinked
                             // chr, fifo, file, socket, symlink
