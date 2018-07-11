@@ -129,6 +129,22 @@ impl Into<i32> for PosixLockCmd {
     }
 }
 
+#[repr(i32)]
+#[derive(PartialEq, Debug, Hash)]
+///  None to Trace correspond to the equivalent gluster log levels
+pub enum GlusterLogLevel {
+    None = 0,
+    Emerg,
+    Alert,
+    Critical,
+    Error,
+    Warning,
+    Notice,
+    Info,
+    Debug,
+    Trace,
+}
+
 // pub type glfs_io_cbk = ::std::option::Option<extern "C" fn(fd: *mut glfs_fd_t,
 // ret: ssize_t,
 // data: *mut c_void)
@@ -290,6 +306,86 @@ impl Gluster {
         unsafe {
             glfs_fini(self.cluster_handle);
         }
+    }
+
+    /// This function specifies logging parameters for the virtual mount.
+    /// Sets the log file to write to
+    pub fn set_logging(
+        &self,
+        logfile: &Path,
+        loglevel: GlusterLogLevel,
+    ) -> Result<(), GlusterError> {
+        let path = try!(CString::new(logfile.as_os_str().as_bytes()));
+        unsafe {
+            let ret_code = glfs_set_logging(self.cluster_handle, path.as_ptr(), loglevel as i32);
+            if ret_code < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+        }
+        Ok(())
+    }
+
+    /// Get the volfile associated with the virtual mount
+    /// Sometimes it's useful e.g. for scripts to see the volfile, so that they
+    /// can parse it and find subvolumes to do things like split-brain resolution
+    /// or custom layouts.
+    /// Note that the volume must be started (not necessarily mounted) for this
+    /// to work.  Also this function isn't very useful at the moment.  It needs
+    /// to be parsed into a volume graph before it's really usable.  
+    // TODO: Change this from String to a struct
+    pub fn get_volfile(&self) -> Result<String, GlusterError> {
+        // Start with 1K buffer and see if that works.  Even small clusters
+        // have pretty large volfiles.
+        let capacity = 1024;
+        let mut buffer: Vec<u8> = Vec::with_capacity(capacity);
+        unsafe {
+            // This will likely fail and gluster will tell me the size it needs
+            let ret = glfs_get_volfile(
+                self.cluster_handle,
+                buffer.as_mut_ptr() as *mut c_void,
+                buffer.capacity() as usize,
+            );
+            if ret > 0 {
+                //>0: filled N bytes of buffer
+                buffer.truncate(ret as usize);
+                buffer.set_len(ret as usize);
+                return Ok(String::from_utf8_lossy(&buffer).into_owned());
+            }
+            if ret == 0 {
+                //0: no volfile available
+                return Err(GlusterError::new("No volfile available".into()));
+            }
+            if ret < 0 {
+                // <0: volfile length exceeds @len by N bytes (@buf unchanged)
+                trace!(
+                    "volfile length is too large.  resizing to {}",
+                    capacity + ret.abs() as usize
+                );
+                let mut buffer: Vec<u8> = Vec::with_capacity(capacity + ret.abs() as usize);
+                let retry = glfs_get_volfile(
+                    self.cluster_handle,
+                    buffer.as_mut_ptr() as *mut c_void,
+                    buffer.capacity() as usize,
+                );
+                if retry > 0 {
+                    //>0: filled N bytes of buffer
+                    buffer.truncate(retry as usize);
+                    buffer.set_len(retry as usize);
+                    return Ok(String::from_utf8_lossy(&buffer).into_owned());
+                }
+                if retry == 0 {
+                    //0: no volfile available
+                    return Err(GlusterError::new("No volfile available".into()));
+                }
+                if ret < 0 {
+                    // I give up
+                    return Err(GlusterError::new(
+                        "volfile changed size while checking".into(),
+                    ));
+                }
+            }
+        }
+        return Err(GlusterError::new("Unknown error getting volfile".into()));
     }
 
     /// Fetch the volume uuid from the glusterd management server
