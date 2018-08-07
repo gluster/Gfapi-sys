@@ -338,20 +338,6 @@ impl Gluster {
         }
     }
 
-    /// Disconnect from a Gluster cluster and destroy the connection handle
-    /// For clean up, this is only necessary after connect() has succeeded.
-    /// Normally there is no need to call this function.  When Rust cleans
-    /// up the Gluster struct it will automatically call disconnect
-    pub fn disconnect(self) {
-        if self.cluster_handle.is_null() {
-            // No cleanup needed
-            return;
-        }
-        unsafe {
-            glfs_fini(self.cluster_handle);
-        }
-    }
-
     /// This function specifies logging parameters for the virtual mount.
     /// Sets the log file to write to
     pub fn set_logging(
@@ -457,6 +443,9 @@ impl Gluster {
         let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
             let file_handle = glfs_open(self.cluster_handle, path.as_ptr(), flags);
+            if file_handle.is_null() {
+                return Err(GlusterError::new(get_error()));
+            }
             Ok(GlusterFile {
                 file_handle: file_handle,
             })
@@ -480,6 +469,7 @@ impl Gluster {
             })
         }
     }
+
     pub fn read(
         &self,
         file: &GlusterFile,
@@ -682,11 +672,7 @@ impl Gluster {
         }
         Ok(())
     }
-    pub fn ftruncate(
-        &self,
-        file_handle: &GlusterFile,
-        length: i64,
-    ) -> Result<(), GlusterError> {
+    pub fn ftruncate(&self, file_handle: &GlusterFile, length: i64) -> Result<(), GlusterError> {
         unsafe {
             let ret_code = glfs_ftruncate(file_handle.file_handle, length);
             if ret_code < 0 {
@@ -860,9 +846,7 @@ impl Gluster {
     fn is_empty(&self, p: &Path) -> Result<bool, GlusterError> {
         let this = Path::new(".");
         let parent = Path::new("..");
-        let d = GlusterDirectory {
-            dir_handle: self.opendir(&p)?,
-        };
+        let d = self.opendir(&p)?;
         for dir_entry in d {
             if dir_entry.path == this || dir_entry.path == parent {
                 continue;
@@ -895,9 +879,7 @@ impl Gluster {
                     trace!("break for PathBuf::from(\"\")");
                     break;
                 }
-                let d = GlusterDirectory {
-                    dir_handle: self.opendir(&p)?,
-                };
+                let d = self.opendir(&p)?;
                 // If there's nothing in there remove the directory
                 if self.is_empty(&p)? {
                     self.rmdir(&p)?;
@@ -976,11 +958,13 @@ impl Gluster {
         Ok(())
     }
 
-    pub fn opendir(&self, path: &Path) -> Result<*mut Struct_glfs_fd, GlusterError> {
+    pub fn opendir(&self, path: &Path) -> Result<GlusterDirectory, GlusterError> {
         let path = try!(CString::new(path.as_os_str().as_bytes()));
         unsafe {
-            let file_handle = glfs_opendir(self.cluster_handle, path.as_ptr());
-            Ok(file_handle)
+            let dir_handle = glfs_opendir(self.cluster_handle, path.as_ptr());
+            Ok(GlusterDirectory {
+                dir_handle: dir_handle,
+            })
         }
     }
     pub fn getxattr(&self, path: &Path, name: &str) -> Result<String, GlusterError> {
@@ -1024,11 +1008,7 @@ impl Gluster {
             Ok(String::from_utf8_lossy(&xattr_val_buff).into_owned())
         }
     }
-    pub fn fgetxattr(
-        &self,
-        file_handle: &GlusterFile,
-        name: &str,
-    ) -> Result<String, GlusterError> {
+    pub fn fgetxattr(&self, file_handle: &GlusterFile, name: &str) -> Result<String, GlusterError> {
         let name = try!(CString::new(name));
         let mut xattr_val_buff: Vec<u8> = Vec::with_capacity(1024);
         unsafe {
@@ -1190,11 +1170,7 @@ impl Gluster {
         }
         Ok(())
     }
-    pub fn fremovexattr(
-        &self,
-        file_handle: &GlusterFile,
-        name: &str,
-    ) -> Result<(), GlusterError> {
+    pub fn fremovexattr(&self, file_handle: &GlusterFile, name: &str) -> Result<(), GlusterError> {
         let name = try!(CString::new(name));
 
         unsafe {
@@ -1347,11 +1323,7 @@ impl Gluster {
         Ok(())
     }
 
-    pub fn fchmod(
-        &self,
-        file_handle: &GlusterFile,
-        mode: mode_t,
-    ) -> Result<(), GlusterError> {
+    pub fn fchmod(&self, file_handle: &GlusterFile, mode: mode_t) -> Result<(), GlusterError> {
         unsafe {
             let ret_code = glfs_fchmod(file_handle.file_handle, mode);
             if ret_code < 0 {
@@ -1409,13 +1381,12 @@ impl Gluster {
     // }
     // }
     //
-    pub fn dup(
-        &self,
-        file_handle: &GlusterFile,
-    ) -> Result<*mut Struct_glfs_fd, GlusterError> {
+    pub fn dup(&self, file_handle: &GlusterFile) -> Result<GlusterFile, GlusterError> {
         unsafe {
             let file_handle = glfs_dup(file_handle.file_handle);
-            Ok(file_handle)
+            Ok(GlusterFile {
+                file_handle: file_handle,
+            })
         }
     }
 }

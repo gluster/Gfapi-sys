@@ -74,7 +74,7 @@ fn main() {
                       }];
     cluster.utimens(&Path::new("gfapi/test"), &file_times).unwrap();
 
-    let d = GlusterDirectory { dir_handle: cluster.opendir(&Path::new("gfapi")).unwrap() };
+    let d  = cluster.opendir(&Path::new("gfapi")).unwrap();
     for dir_entry in d {
         println!("Dir_entry: {:?}", dir_entry);
     }
