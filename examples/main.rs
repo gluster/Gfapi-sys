@@ -31,7 +31,7 @@ fn main() {
         };
 
 
-    match cluster.write(&file_handle, &"hello world".as_bytes(), O_APPEND) {
+    match file_handle.write(&"hello world".as_bytes(), O_APPEND) {
         Ok(bytes_written) => {
             println!("Wrote {} bytes", bytes_written);
         }
@@ -40,7 +40,7 @@ fn main() {
             return;
         }
     };
-    match cluster.lseek(&file_handle, 0, SEEK_SET) {
+    match file_handle.lseek(0, SEEK_SET) {
         Ok(_) => {
             println!("Seek back to 0");
         }
@@ -50,7 +50,7 @@ fn main() {
         }
     };
     let mut read_buff: Vec<u8> = Vec::with_capacity(1024);
-    match cluster.read(&file_handle, &mut read_buff, 1024, 0) {
+    match file_handle.read(&mut read_buff, 1024, 0) {
         Ok(bytes_read) => {
             println!("Read {} bytes", bytes_read);
             read_buff.truncate(bytes_read as usize);
