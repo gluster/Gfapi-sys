@@ -174,7 +174,10 @@ impl Drop for GlusterFile {
             return;
         }
         unsafe {
-            glfs_close(self.file_handle);
+            let retcode = glfs_close(self.file_handle);
+            if retcode < 0 {
+                error!("{:?}", GlusterError::new(get_error()));
+            }
         }
     }
 }
@@ -212,7 +215,10 @@ impl Drop for GlusterDirectoryPlus {
             return;
         }
         unsafe {
-            glfs_closedir(self.dir_handle);
+            let retcode = glfs_closedir(self.dir_handle);
+            if retcode < 0 {
+                error!("{:?}", GlusterError::new(get_error()));
+            }
         }
     }
 }
@@ -263,7 +269,10 @@ impl Drop for GlusterDirectory {
             return;
         }
         unsafe {
-            glfs_closedir(self.dir_handle);
+            let retcode = glfs_closedir(self.dir_handle);
+            if retcode < 0 {
+                error!("{:?}", GlusterError::new(get_error()));
+            }
         }
     }
 }
