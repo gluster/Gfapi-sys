@@ -327,12 +327,16 @@ impl Gluster {
                 port as ::libc::c_int,
             );
             if ret_code < 0 {
+                // We call glfs_fini here because Gluster hasn't been created yet
+                // so Drop won't be run.
                 glfs_fini(cluster_handle);
                 return Err(GlusterError::new(get_error()));
             }
 
             let ret_code = glfs_init(cluster_handle);
             if ret_code < 0 {
+                // We call glfs_fini here because Gluster hasn't been created yet
+                // so Drop won't be run.
                 glfs_fini(cluster_handle);
                 return Err(GlusterError::new(get_error()));
             }
