@@ -1,10 +1,10 @@
 use errno::{errno, Errno};
 use glfs::*;
 use libc::{
-    c_uchar, c_void, dev_t, dirent, flock, ino_t, mode_t, stat, statvfs, timespec, DT_DIR,
-    ENOENT, LOCK_EX, LOCK_SH, LOCK_UN,
+    c_uchar, c_void, dev_t, dirent, flock, ino_t, mode_t, stat, statvfs, timespec, DT_DIR, ENOENT,
+    LOCK_EX, LOCK_SH, LOCK_UN,
 };
-use uuid::{ParseError, Uuid};
+use uuid::Uuid;
 
 use std::error::Error as err;
 use std::ffi::{CStr, CString, IntoStringError, NulError};
@@ -19,12 +19,12 @@ use std::string::FromUtf8Error;
 /// Custom error handling for the library
 #[derive(Debug)]
 pub enum GlusterError {
+    BytesError(uuid::BytesError),
     Error(String),
     FromUtf8Error(FromUtf8Error),
     IntoStringError(IntoStringError),
     IoError(Error),
     NulError(NulError),
-    ParseError(ParseError),
 }
 
 impl fmt::Display for GlusterError {
@@ -36,22 +36,22 @@ impl fmt::Display for GlusterError {
 impl err for GlusterError {
     fn description(&self) -> &str {
         match *self {
+            GlusterError::BytesError(ref e) => e.description(),
             GlusterError::Error(ref e) => &e,
             GlusterError::FromUtf8Error(ref e) => e.description(),
             GlusterError::IntoStringError(ref e) => e.description(),
             GlusterError::IoError(ref e) => e.description(),
             GlusterError::NulError(ref e) => e.description(),
-            GlusterError::ParseError(ref e) => e.description(),
         }
     }
     fn cause(&self) -> Option<&err> {
         match *self {
+            GlusterError::BytesError(ref e) => e.cause(),
             GlusterError::Error(_) => None,
             GlusterError::FromUtf8Error(ref e) => e.cause(),
             GlusterError::IntoStringError(ref e) => e.cause(),
             GlusterError::IoError(ref e) => e.cause(),
             GlusterError::NulError(ref e) => e.cause(),
-            GlusterError::ParseError(ref e) => e.cause(),
         }
     }
 }
@@ -64,13 +64,19 @@ impl GlusterError {
     /// Convert a GlusterError into a String representation.
     pub fn to_string(&self) -> String {
         match *self {
+            GlusterError::BytesError(ref err) => err.description().to_string(),
             GlusterError::Error(ref err) => err.to_string(),
             GlusterError::FromUtf8Error(ref err) => err.utf8_error().to_string(),
             GlusterError::IntoStringError(ref err) => err.description().to_string(),
             GlusterError::IoError(ref err) => err.description().to_string(),
             GlusterError::NulError(ref err) => err.description().to_string(),
-            GlusterError::ParseError(ref err) => err.description().to_string(),
         }
+    }
+}
+
+impl From<uuid::BytesError> for GlusterError {
+    fn from(err: uuid::BytesError) -> GlusterError {
+        GlusterError::BytesError(err)
     }
 }
 
@@ -98,11 +104,11 @@ impl From<Error> for GlusterError {
     }
 }
 
-impl From<ParseError> for GlusterError {
-    fn from(err: ParseError) -> GlusterError {
-        GlusterError::ParseError(err)
-    }
-}
+//impl From<uuid::parser::ParseError> for GlusterError {
+    //fn from(err: uuid::parser::ParseError) -> GlusterError {
+        //GlusterError::ParseError(err)
+    //}
+//}
 
 fn get_error() -> String {
     let error = errno();
@@ -443,7 +449,7 @@ impl Gluster {
             // Inform Rust how many bytes gluster copied into the buffer
             buff.set_len(ret_code as usize);
         }
-        let uuid = Uuid::from_bytes(&buff)?;
+        let uuid = Uuid::from_slice(&buff)?;
         Ok(uuid)
     }
 
@@ -756,7 +762,6 @@ impl Gluster {
             })
         }
     }
-
 
     pub fn getxattr(&self, path: &Path, name: &str) -> Result<String, GlusterError> {
         let path = try!(CString::new(path.as_os_str().as_bytes()));
