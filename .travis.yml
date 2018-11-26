@@ -1,13 +1,26 @@
-sudo: required
+sudo: true
 dist: trusty
-language: rust
-addons:
-  apt:
-    packages:
-      - libffi-dev libffi6 texinfo
+services:
+  - docker
 before_install:
-  - sudo add-apt-repository ppa:gluster/glusterfs-3.8 -y
-  - sudo apt-get update -q
-  - sudo apt-get install glusterfs-common glusterfs-server -y
-install:
-  - sudo bin/install-gluster.sh
+  - docker pull ubuntu
+  - mkdir gluster-brick
+  - docker run -d -i -t --privileged --name rust-builder -v $(pwd):/home/ubuntu/gfapi -v $(pwd)/gluster-brick:/mnt/gluster-brick -w /home/ubuntu/gfapi ubuntu:16.04 /bin/bash
+  - docker exec rust-builder /usr/bin/apt-get update
+  - docker exec rust-builder apt-get -y install curl libffi-dev libffi6 texinfo pkg-config make clang software-properties-common
+  - docker exec rust-builder add-apt-repository ppa:gluster/glusterfs-3.12 -y
+  - docker exec rust-builder apt-get install glusterfs-common glusterfs-server -y
+  - docker exec rust-builder /usr/sbin/glusterd
+  - docker exec rust-builder /bin/sh -c '/usr/sbin/gluster vol create test $HOSTNAME:/mnt/gluster-brick force'
+  - docker exec rust-builder /usr/sbin/gluster vol start test
+  - docker exec rust-builder /usr/sbin/gluster vol set test server.allow-insecure on
+  - docker exec rust-builder mkdir /mnt/glusterfs
+  - docker exec rust-builder mount -t glusterfs localhost:test /mnt/glusterfs
+  - docker exec rust-builder mkdir /mnt/glusterfs/gfapi
+  - docker exec rust-builder chmod 777 /mnt/glusterfs/gfapi
+  - docker exec rust-builder curl https://sh.rustup.rs -o rustup.sh
+  - docker exec rust-builder chmod +x rustup.sh
+  - docker exec rust-builder ./rustup.sh -y
+script:
+  - docker exec rust-builder /root/.cargo/bin/cargo build --verbose --all
+  - docker exec rust-builder /root/.cargo/bin/cargo test --verbose --all
