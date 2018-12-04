@@ -1,17 +1,15 @@
 #![allow(non_camel_case_types)]
-use libc::{c_char, c_int, c_long, c_void, dev_t, dirent, gid_t, flock, mode_t, off_t, size_t,
-           stat, ssize_t, statvfs, timespec, uid_t};
+use libc::{
+    c_char, c_int, c_long, c_void, dev_t, dirent, flock, gid_t, mode_t, off_t, size_t, ssize_t,
+    stat, statvfs, timespec, uid_t,
+};
 
-pub enum Struct_glfs { }
+pub enum Struct_glfs {}
 pub type glfs_t = Struct_glfs;
-pub enum Struct_glfs_fd { }
+pub enum Struct_glfs_fd {}
 pub type glfs_fd_t = Struct_glfs_fd;
-pub type glfs_io_cbk = ::std::option::Option<
-    extern "C" fn(fd: *mut glfs_fd_t,
-                  ret: ssize_t,
-                  data: *mut c_void)
-                  -> (),
->;
+pub type glfs_io_cbk =
+    ::std::option::Option<extern "C" fn(fd: *mut glfs_fd_t, ret: ssize_t, data: *mut c_void) -> ()>;
 
 #[repr(C)]
 pub struct iovec {
