@@ -28,7 +28,7 @@ pub enum GlusterError {
 }
 
 impl fmt::Display for GlusterError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.description())
     }
 }
@@ -44,7 +44,7 @@ impl err for GlusterError {
             GlusterError::NulError(ref e) => e.description(),
         }
     }
-    fn cause(&self) -> Option<&err> {
+    fn cause(&self) -> Option<&dyn err> {
         match *self {
             GlusterError::BytesError(ref e) => e.cause(),
             GlusterError::Error(_) => None,
