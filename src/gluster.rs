@@ -1,5 +1,5 @@
 use errno::{errno, Errno};
-use glfs::*;
+use crate::glfs::*;
 use libc::{
     c_uchar, c_void, dev_t, dirent, flock, ino_t, mode_t, stat, statvfs, timespec, DT_DIR, ENOENT,
     LOCK_EX, LOCK_SH, LOCK_UN,
