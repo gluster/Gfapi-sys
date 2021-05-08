@@ -661,6 +661,9 @@ impl Gluster {
                 let d = self.opendir(&p)?;
                 // If there's nothing in there remove the directory
                 if self.is_empty(&p)? {
+                    if p == path {
+                        break
+                    }
                     self.rmdir(&p)?;
                     // Remove this dir from the PathBuf
                     p.pop();
@@ -693,11 +696,13 @@ impl Gluster {
                         }
                     }
                 }
-                if stack.len() == 0 {
+                if self.is_empty(&p)? && (p != path) {
                     self.rmdir(&p)?;
                     // There's a parent directory left to remove
-                    if p.pop() {
-                        stack.push(p);
+                    if stack.len() == 0 {
+                        if p.pop() {
+                            stack.push(p);
+                        }
                     }
                 }
             } else {
