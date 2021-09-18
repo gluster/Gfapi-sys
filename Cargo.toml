@@ -14,6 +14,9 @@ libc = "^0.2"
 log = "~0.4"
 uuid = {version="0.7", features=["std"]}
 
+[build-dependencies]
+bindgen = "0.59"
+
 [badges]
 travis-ci = { repository = "gluster/Gfapi-sys" }
 

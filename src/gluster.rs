@@ -164,13 +164,13 @@ pub enum GlusterLogLevel {
 
 #[derive(Debug)]
 pub struct Gluster {
-    cluster_handle: *mut Struct_glfs,
+    cluster_handle: *mut glfs,
 }
 
 /// Gluster file descriptor
 #[derive(Debug)]
 pub struct GlusterFile {
-    file_handle: *mut Struct_glfs_fd,
+    file_handle: *mut glfs_fd,
 }
 
 impl Drop for GlusterFile {
@@ -211,7 +211,7 @@ impl Drop for Gluster {
 /// to returning directory entries this also stats each file.
 #[derive(Debug)]
 pub struct GlusterDirectoryPlus {
-    pub dir_handle: *mut Struct_glfs_fd,
+    pub dir_handle: *mut glfs_fd,
 }
 
 impl Drop for GlusterDirectoryPlus {
@@ -265,7 +265,7 @@ impl Iterator for GlusterDirectoryPlus {
 
 #[derive(Debug)]
 pub struct GlusterDirectory {
-    pub dir_handle: *mut Struct_glfs_fd,
+    pub dir_handle: *mut glfs_fd,
 }
 
 impl Drop for GlusterDirectory {
@@ -1074,6 +1074,7 @@ impl GlusterFile {
                 count,
                 offset,
                 flags,
+                std::ptr::null_mut(),
             );
             if read_size < 0 {
                 return Err(GlusterError::new(get_error()));
@@ -1096,6 +1097,8 @@ impl GlusterFile {
                 count,
                 offset,
                 flags,
+                std::ptr::null_mut(),
+                std::ptr::null_mut()
             );
             if write_size < 0 {
                 return Err(GlusterError::new(get_error()));
@@ -1151,7 +1154,7 @@ impl GlusterFile {
     }
     pub fn ftruncate(&self, length: i64) -> Result<(), GlusterError> {
         unsafe {
-            let ret_code = glfs_ftruncate(self.file_handle, length);
+            let ret_code = glfs_ftruncate(self.file_handle, length, std::ptr::null_mut(), std::ptr::null_mut());
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
@@ -1170,7 +1173,7 @@ impl GlusterFile {
     }
     pub fn fsync(&self) -> Result<(), GlusterError> {
         unsafe {
-            let ret_code = glfs_fsync(self.file_handle);
+            let ret_code = glfs_fsync(self.file_handle, std::ptr::null_mut(), std::ptr::null_mut());
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
@@ -1180,7 +1183,7 @@ impl GlusterFile {
 
     pub fn fdatasync(&self) -> Result<(), GlusterError> {
         unsafe {
-            let ret_code = glfs_fdatasync(self.file_handle);
+            let ret_code = glfs_fdatasync(self.file_handle, std::ptr::null_mut(), std::ptr::null_mut());
             if ret_code < 0 {
                 return Err(GlusterError::new(get_error()));
             }
