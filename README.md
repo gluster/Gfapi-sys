@@ -5,6 +5,8 @@ Gluster gfapi C library.
 Higher level safe abstractions are provided by the gluster.rs file.  These safe bindings are only partially implemented.
 For an example of how to use the bindings please see the [examples](https://github.com/gluster/Gfapi-sys/tree/master/examples) directory. 
 
+Note: These bindings will fail to build with Glusterfs 3.x series
+
 # Projects written with Gfapi-sys
 
 Here is a list of known projects using gfapi-sys:
