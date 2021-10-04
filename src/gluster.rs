@@ -997,7 +997,18 @@ impl GlusterFile {
         self.pread(fill_buffer, count, 0, flags)
     }
     pub fn write(&self, buffer: &[u8], flags: i32) -> Result<isize, GlusterError> {
-        self.pwrite(buffer, buffer.len(), 0, flags)
+        unsafe {
+            let write_size = glfs_write(
+                self.file_handle,
+                buffer.as_ptr() as *mut c_void,
+                buffer.len(),
+                flags,
+                );
+            if write_size < 0 {
+                return Err(GlusterError::new(get_error()));
+            }
+            Ok(write_size)
+        }
     }
 
     /*
