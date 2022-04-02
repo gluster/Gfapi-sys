@@ -315,7 +315,7 @@ impl Iterator for GlusterDirectory {
 }
 
 impl Gluster {
-    /// Connect to a Ceph cluster and return a connection handle glfs_t
+    /// Connect to a GlusterFS cluster and return a connection handle glfs_t
     /// port is usually 24007 but may differ depending on how the service was configured
     pub fn connect(volume_name: &str, server: &str, port: u16) -> Result<Gluster, GlusterError> {
         let vol_name = CString::new(volume_name)?;
