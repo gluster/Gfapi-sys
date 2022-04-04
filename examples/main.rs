@@ -6,6 +6,7 @@ use std::path::Path;
 use gfapi_sys::gluster::*;
 use libc::{
     timespec, O_APPEND, O_CREAT, O_RDWR, O_TRUNC, SEEK_SET, S_IRGRP, S_IROTH, S_IRUSR, S_IWUSR,
+    S_IXUSR,
 };
 
 fn main() {
@@ -17,7 +18,7 @@ fn main() {
         }
     };
     // mkdir with 644 permissions ( User Read + Write, Group Read, Other Read)
-    match cluster.mkdir(&Path::new("gfapi"), S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) {
+    match cluster.mkdir(&Path::new("gfapi"), S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH | S_IXUSR) {
         Ok(_) => println!("mkdir gfapi success"),
         Err(e) => {
             println!("mkdir failed: {:?}", e);
